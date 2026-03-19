@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>城乡共同配送可视化系统</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Source+Han+Serif+CN:wght@500;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f3ef;--bg2:#eceae5;--white:#fff;
+  --ink:#1a1a2e;--ink2:#3a3a52;--ink3:#6b6b80;--ink4:#9a9aac;--ink5:#c4c4d0;
+  --red:#d94230;--redA:rgba(217,66,48,.08);
+  --blue:#2966c4;--blueA:rgba(41,102,196,.08);
+  --green:#1a854a;--greenA:rgba(26,133,74,.08);
+  --amber:#c27d1a;--amberA:rgba(194,125,26,.08);
+  --purple:#7c4dba;--purpleA:rgba(124,77,186,.08);
+  --bd:#ddd9d2;--bd2:#ccc8c0;
+  --shadow:0 1px 3px rgba(26,26,46,.06),0 1px 2px rgba(26,26,46,.04);
+  --shadow2:0 4px 12px rgba(26,26,46,.08),0 1px 3px rgba(26,26,46,.04);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:15px}
+body{
+  min-height:100vh;
+  font-family:'Noto Sans SC',system-ui,sans-serif;
+  background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── HEADER ── */
+.hdr{
+  position:sticky;top:0;z-index:200;
+  background:var(--white);
+  border-bottom:1px solid var(--bd);
+  padding:0 clamp(16px,3vw,40px);
+  display:flex;align-items:center;height:56px;
+  box-shadow:0 1px 4px rgba(26,26,46,.04);
+}
+.hdr-title{
+  font-family:'Playfair Display','Source Han Serif CN',serif;
+  font-size:1.15rem;font-weight:700;color:var(--ink);
+  letter-spacing:.5px;
+}
+.hdr-sep{width:1px;height:22px;background:var(--bd);margin:0 16px}
+.hdr-sub{font-size:.72rem;color:var(--ink3);letter-spacing:.3px;font-weight:400}
+.hdr-tag{
+  margin-left:auto;
+  font-family:'IBM Plex Mono',monospace;font-size:.65rem;
+  color:var(--ink3);letter-spacing:.5px;
+  background:var(--bg);border:1px solid var(--bd);
+  border-radius:4px;padding:4px 12px;font-weight:500;
+}
+
+/* ── NAV ── */
+.nav{
+  background:var(--white);
+  border-bottom:1px solid var(--bd);
+  display:flex;
+  padding:0 clamp(16px,3vw,40px);
+}
+.nav::-webkit-scrollbar{display:none}
+.nav-item{
+  padding:14px 20px;font-size:.8rem;
+  color:var(--ink3);cursor:pointer;white-space:nowrap;
+  border-bottom:2.5px solid transparent;
+  transition:color .15s,border-color .15s;user-select:none;
+  font-weight:500;
+}
+.nav-item:hover{color:var(--ink2)}
+.nav-item.active{color:var(--red);border-bottom-color:var(--red)}
+.nav-dd{position:relative}
+.nav-dd>.nav-item{border-bottom-color:transparent}
+.nav-dd-menu{
+  display:none;position:absolute;top:100%;left:0;
+  background:var(--white);border:1px solid var(--bd);border-radius:8px;
+  box-shadow:var(--shadow2);min-width:180px;z-index:300;
+  padding:6px 0;
+}
+.nav-dd:hover .nav-dd-menu,.nav-dd.open .nav-dd-menu{display:block}
+.nav-dd:hover>.nav-item,.nav-dd.open>.nav-item{color:var(--ink2)}
+.nav-dd-item{
+  padding:10px 18px;font-size:.75rem;color:var(--ink2);cursor:pointer;
+  transition:background .1s;font-weight:500;
+}
+.nav-dd-item:hover{background:var(--bg);color:var(--red)}
+.nav-dd.active>.nav-item{color:var(--red);border-bottom-color:var(--red)}
+
+/* ── LAYOUT ── */
+.main{max-width:1360px;margin:0 auto;padding:28px clamp(16px,3vw,40px) 60px}
+.page{display:none}.page.active{display:block;animation:fadeup .3s ease}
+@keyframes fadeup{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.collapse-sec{cursor:pointer;user-select:none}
+.collapse-sec .arr{display:inline-block;transition:transform .2s;font-size:.7rem;margin-left:6px;color:var(--ink4)}
+.collapse-sec.open .arr{transform:rotate(180deg)}
+.collapse-body{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.collapse-body.open{max-height:5000px;overflow:visible}
+
+/* ── SECTION TITLE ── */
+.sec{
+  font-family:'Playfair Display','Source Han Serif CN',serif;
+  font-size:1.05rem;font-weight:700;color:var(--ink);
+  margin-bottom:22px;
+  display:flex;align-items:baseline;gap:10px;
+}
+.sec::before{content:'';display:block;width:4px;height:18px;background:var(--red);border-radius:2px;flex-shrink:0;align-self:center}
+.sec small{font-family:'Noto Sans SC',sans-serif;font-weight:400;color:var(--ink4);font-size:.72rem;letter-spacing:.3px}
+
+/* ── METRIC CARDS ── */
+.mts{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:24px}
+.mc{
+  background:var(--white);border:1px solid var(--bd);border-radius:10px;
+  padding:20px;box-shadow:var(--shadow);
+  transition:box-shadow .2s,transform .2s;
+}
+.mc:hover{box-shadow:var(--shadow2);transform:translateY(-1px)}
+.mc-l{font-size:.62rem;color:var(--ink4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:600}
+.mc-v{font-family:'IBM Plex Mono',monospace;font-size:1.75rem;font-weight:600;line-height:1;margin-bottom:5px}
+.mc-s{font-size:.68rem;color:var(--ink4);font-weight:400}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.gf{margin-bottom:16px}
+
+/* ── CHART CARD ── */
+.cc{
+  background:var(--white);border:1px solid var(--bd);border-radius:10px;
+  padding:20px;box-shadow:var(--shadow);
+}
+.cc h3{
+  font-size:.68rem;color:var(--ink3);letter-spacing:.5px;
+  margin-bottom:14px;font-weight:600;text-transform:uppercase;
+}
+.cc canvas{max-height:250px}
+
+/* ── TABLE ── */
+.tc{background:var(--white);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow)}
+.th{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bd)}
+.th h3{font-size:.68rem;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+table{width:100%;border-collapse:collapse}
+th{background:var(--bg);padding:10px 16px;text-align:left;font-size:.62rem;color:var(--ink3);letter-spacing:.8px;text-transform:uppercase;font-weight:600}
+td{padding:10px 16px;font-size:.75rem;border-top:1px solid var(--bd)}
+tr:hover td{background:rgba(217,66,48,.015)}
+
+/* ── BADGES ── */
+.badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:.62rem;font-weight:600;letter-spacing:.3px}
+.bd-log{background:var(--blueA);color:var(--blue)}
+.bd-bus{background:var(--greenA);color:var(--green)}
+.bd-crowd{background:var(--amberA);color:var(--amber)}
+.bd-un{background:var(--redA);color:var(--red)}
+
+/* ── CONTROLS ── */
+.sr{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+.sb{
+  padding:7px 16px;border-radius:6px;font-size:.72rem;
+  border:1px solid var(--bd);background:var(--white);color:var(--ink3);
+  cursor:pointer;transition:all .15s;font-family:inherit;font-weight:500;
+}
+.sb:hover{border-color:var(--bd2);color:var(--ink2);background:var(--bg)}
+.sb.active{background:var(--red);border-color:var(--red);color:#fff}
+.sl{font-size:.72rem;color:var(--ink3);font-weight:500}
+
+/* ── PAGINATION ── */
+.pr{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--bd)}
+.pi{font-size:.68rem;color:var(--ink4)}
+
+/* ── INPUTS ── */
+.fi{
+  background:var(--bg);border:1px solid var(--bd);border-radius:6px;
+  padding:6px 12px;color:var(--ink);font-size:.72rem;outline:none;
+  font-family:inherit;width:150px;font-weight:400;
+}
+.fi:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(41,102,196,.1)}
+.fi::placeholder{color:var(--ink5)}
+.fs{background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;color:var(--ink);font-size:.72rem;font-family:inherit}
+.fr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ── MAP ── */
+.map-wrap{
+  background:var(--white);border:1px solid var(--bd);border-radius:10px;
+  position:relative;overflow:hidden;margin-bottom:16px;
+  box-shadow:var(--shadow);
+}
+#map-canvas{display:block;width:100%;background:#fafaf8}
+
+.map-legend{
+  position:absolute;top:16px;right:16px;
+  background:rgba(255,255,255,.94);border:1px solid var(--bd);
+  border-radius:8px;padding:14px 16px;
+  display:flex;flex-direction:column;gap:5px;
+  backdrop-filter:blur(8px);box-shadow:var(--shadow);
+}
+.ml-title{font-size:.58rem;color:var(--ink4);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;font-weight:700}
+.ml-item{display:flex;align-items:center;gap:8px;font-size:.68rem;color:var(--ink2)}
+.ml-line{width:22px;height:3px;border-radius:2px}
+.ml-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ml-tri{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:10px solid var(--red);flex-shrink:0}
+
+.map-controls{
+  position:absolute;bottom:14px;right:14px;
+  display:flex;flex-direction:column;gap:4px;
+}
+.mc-btn{
+  background:rgba(255,255,255,.92);border:1px solid var(--bd);
+  border-radius:5px;padding:5px 12px;font-size:.62rem;
+  color:var(--ink4);cursor:pointer;transition:all .15s;
+  font-weight:600;text-align:left;font-family:inherit;
+  backdrop-filter:blur(4px);
+}
+.mc-btn.on{border-color:var(--c,var(--red));color:var(--c,var(--red));background:rgba(255,255,255,.96)}
+
+.map-title{
+  position:absolute;top:14px;left:18px;
+  font-family:'Playfair Display',serif;font-size:.78rem;color:var(--ink2);letter-spacing:.5px;font-weight:500;
+}
+
+@media(max-width:900px){
+  .g2,.g3{grid-template-columns:1fr}
+  .main,.hdr,.nav{padding-left:14px;padding-right:14px}
+}
+
+/* ── STATION TOOLTIP ── */
+.stn-tip-wrap{display:inline-block;cursor:pointer}
+#stn-float-tip{
+  display:none;position:fixed;z-index:500;
+  background:var(--white);border:1px solid var(--bd);border-radius:10px;
+  box-shadow:var(--shadow2);padding:14px 16px;
+  min-width:280px;max-width:400px;max-height:320px;overflow-y:auto;
+  pointer-events:none;
+}
+#stn-float-tip h4{font-size:.7rem;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;font-weight:600}
+#stn-float-tip table{width:100%;border-collapse:collapse}
+#stn-float-tip th{background:var(--bg);padding:5px 8px;text-align:left;font-size:.58rem;color:var(--ink3);letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+#stn-float-tip td{padding:4px 8px;font-size:.68rem;border-top:1px solid var(--bd)}
+#stn-float-tip::-webkit-scrollbar{width:4px}
+#stn-float-tip::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="stn-float-tip"></div>
+
+<div class="hdr">
+  <div class="hdr-title">城乡共同配送分析系统</div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-sub">县域三级物流体系 · 多模式协同配送</div>
+  <div class="hdr-tag" style="display:none">200 ORDERS · 10 UNSERVED</div>
+</div>
+
+<div class="nav">
+  <div class="nav-item active" onclick="showPage('overview')">配送网络</div>
+  <div class="nav-item" onclick="showPage('orders')">客户需求</div>
+  <div class="nav-dd" id="dd-routes">
+    <div class="nav-item" onclick="this.parentElement.classList.toggle('open')">运营总览 <span style="font-size:.6rem;margin-left:2px">▾</span></div>
+    <div class="nav-dd-menu">
+      <div class="nav-dd-item" onclick="showPage('routes');closeDDs()">运营总览</div>
+      <div class="nav-dd-item" onclick="showPage('routePath');closeDDs()">实际配送路径</div>
+      <div class="nav-dd-item" onclick="showPage('routeOrders');closeDDs()">订单明细</div>
+    </div>
+  </div>
+  <div class="nav-dd" id="dd-param">
+    <div class="nav-item" id="nav-param" onclick="this.parentElement.classList.toggle('open')">参数分析 <span style="font-size:.6rem;margin-left:2px">▾</span></div>
+    <div class="nav-dd-menu">
+      <div class="nav-dd-item" onclick="showPage('model');closeDDs()">模式对比</div>
+      <div class="nav-dd-item" onclick="showPage('busCap');closeDDs()">公交容量敏感性</div>
+      <div class="nav-dd-item" onclick="showPage('penalty');closeDDs()">惩罚系数敏感性</div>
+      <div class="nav-dd-item" onclick="showPage('weight');closeDDs()">需求重量敏感性</div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ===== OVERVIEW ===== -->
+<div class="page active" id="page-overview">
+  <div class="sec">配送网络 <small>站点分布与运营路线</small></div>
+  <div class="map-wrap" id="map-wrap">
+    <div class="map-title">站点分布与配送路线图（km）</div>
+    <canvas id="map-canvas"></canvas>
+    <div class="map-legend">
+      <div class="ml-title">图例</div>
+      <div class="ml-item"><div class="ml-tri"></div>县域配送中心</div>
+      <div class="ml-item"><div class="ml-dot" style="background:var(--blue);box-shadow:0 0 4px var(--blue)"></div>乡镇级站点</div>
+      <div class="ml-item"><div class="ml-dot" style="background:var(--ink5)"></div>村级站点</div>
+      <div style="margin-top:5px;border-top:1px solid var(--bd);padding-top:7px">
+      <div class="ml-title" style="margin-bottom:4px">公交线路</div>
+      <div class="ml-item"><div class="ml-line" style="background:#2966c4"></div>公交1线</div>
+      <div class="ml-item"><div class="ml-line" style="background:#1a854a"></div>公交2线</div>
+      <div class="ml-item"><div class="ml-line" style="background:#7c4dba"></div>公交3线</div>
+      <div class="ml-item"><div class="ml-line" style="background:#d94230"></div>公交4线</div>
+      <div class="ml-item"><div class="ml-line" style="background:#c27d1a"></div>公交5线</div>
+      </div>
+      <div style="margin-top:5px;border-top:1px solid var(--bd);padding-top:7px">
+      <div class="ml-item"><div class="ml-line" style="background:#2966c4;opacity:.5;height:2px;border-top:2px dashed #2966c4"></div>物流专车</div>
+      <div class="ml-item"><div class="ml-line" style="background:#9a9aac;opacity:.6;height:1px;border-top:1.5px dashed #9a9aac"></div>众包车辆</div>
+      </div>
+    </div>
+    <div class="map-controls">
+      <div class="mc-btn on" style="--c:#2966c4" onclick="toggleRoute('b1',this)">1线</div>
+      <div class="mc-btn on" style="--c:#1a854a" onclick="toggleRoute('b2',this)">2线</div>
+      <div class="mc-btn on" style="--c:#7c4dba" onclick="toggleRoute('b3',this)">3线</div>
+      <div class="mc-btn on" style="--c:#d94230" onclick="toggleRoute('b4',this)">4线</div>
+      <div class="mc-btn on" style="--c:#c27d1a" onclick="toggleRoute('b5',this)">5线</div>
+      <div class="mc-btn on" style="--c:#2966c4" onclick="toggleRoute('log',this)">物流</div>
+      <div class="mc-btn on" style="--c:#9a9aac" onclick="toggleRoute('crowd',this)">众包</div>
+    </div>
+  </div>
+
+  <div class="g2" style="margin-top:16px">
+    <div class="tc">
+      <div class="th"><h3>物流专车发车频率</h3></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>车辆序号</th><th>发车时间</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr><td style="font-family:'IBM Plex Mono',monospace;font-weight:600">车辆 1</td><td style="font-family:'IBM Plex Mono',monospace">08:00</td><td style="color:var(--ink3)">首发</td></tr>
+          <tr><td style="font-family:'IBM Plex Mono',monospace;font-weight:600">车辆 2</td><td style="font-family:'IBM Plex Mono',monospace">08:00</td><td style="color:var(--ink3)">首发</td></tr>
+          <tr><td style="font-family:'IBM Plex Mono',monospace;font-weight:600">车辆 3</td><td style="font-family:'IBM Plex Mono',monospace">13:00</td><td style="color:var(--ink3)">午后</td></tr>
+          <tr><td style="font-family:'IBM Plex Mono',monospace;font-weight:600">车辆 4</td><td style="font-family:'IBM Plex Mono',monospace">13:00</td><td style="color:var(--ink3)">午后</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="tc">
+      <div class="th"><h3>城乡公交线路及发车班次</h3></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>线路</th><th>运行线路</th><th>班次</th><th>发车间隔</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge" style="background:rgba(41,102,196,.08);color:#2966c4">1线</span></td><td style="font-family:'IBM Plex Mono',monospace;font-size:.7rem">0→2→4→22→21→23</td><td>3 班/天</td><td style="font-family:'IBM Plex Mono',monospace">3小时20分</td></tr>
+          <tr><td><span class="badge" style="background:rgba(26,133,74,.08);color:#1a854a">2线</span></td><td style="font-family:'IBM Plex Mono',monospace;font-size:.7rem">0→6→3→16→15→14</td><td>3 班/天</td><td style="font-family:'IBM Plex Mono',monospace">3小时20分</td></tr>
+          <tr><td><span class="badge" style="background:rgba(124,77,186,.08);color:#7c4dba">3线</span></td><td style="font-family:'IBM Plex Mono',monospace;font-size:.7rem">0→5→7→24→9→11</td><td>3 班/天</td><td style="font-family:'IBM Plex Mono',monospace">3小时20分</td></tr>
+          <tr><td><span class="badge" style="background:rgba(217,66,48,.08);color:#d94230">4线</span></td><td style="font-family:'IBM Plex Mono',monospace;font-size:.7rem">0→18→1→20→13→12</td><td>3 班/天</td><td style="font-family:'IBM Plex Mono',monospace">3小时20分</td></tr>
+          <tr><td><span class="badge" style="background:rgba(194,125,26,.08);color:#c27d1a">5线</span></td><td style="font-family:'IBM Plex Mono',monospace;font-size:.7rem">0→10→19→8→17→25</td><td>3 班/天</td><td style="font-family:'IBM Plex Mono',monospace">3小时20分</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="cc"><h3>物流专车发车时间线</h3><canvas id="net-log-timeline"></canvas></div>
+    <div class="cc"><h3>公交各线路发车时间线</h3><canvas id="net-bus-timeline"></canvas></div>
+  </div>
+
+</div>
+
+<!-- ===== DELIVERY OVERVIEW ===== -->
+<div class="page" id="page-routes">
+  <div class="sec">运营总览 <small>成本结构与运力配置</small></div>
+  <div class="mts">
+    <div class="mc"><div class="mc-l">总成本</div><div class="mc-v" style="color:var(--red)">259.95</div><div class="mc-s">元 · 100容量方案</div></div>
+    <div class="mc"><div class="mc-l">物流专车</div><div class="mc-v" style="color:var(--blue)">74</div><div class="mc-s">37% · 固定路线</div></div>
+    <div class="mc"><div class="mc-l">公交捎带</div><div class="mc-v" style="color:var(--green)">77</div><div class="mc-s">38.5% · 5条线路</div></div>
+    <div class="mc"><div class="mc-l">众包车辆</div><div class="mc-v" style="color:var(--amber)">39</div><div class="mc-s">19.5% · 8条路线</div></div>
+    <div class="mc"><div class="mc-l">传统对比节省</div><div class="mc-v" style="color:var(--green)">40%</div><div class="mc-s">434.6 → 259.95 元</div></div>
+    <div class="mc"><div class="mc-l">未服务订单</div><div class="mc-v" style="color:var(--red)">10</div><div class="mc-s">5% · 10条未完成</div></div>
+  </div>
+  <div class="mts">
+    <div class="mc"><div class="mc-l">物流车辆运输成本</div><div class="mc-v" style="color:var(--blue)">74.54</div><div class="mc-s">元 · 4辆专车</div></div>
+    <div class="mc"><div class="mc-l">城乡公交运输成本</div><div class="mc-v" style="color:var(--green)">32.78</div><div class="mc-s">元 · 5条线路</div></div>
+    <div class="mc"><div class="mc-l">众包车辆运输成本</div><div class="mc-v" style="color:var(--amber)">50.22</div><div class="mc-s">元 · 8条路线</div></div>
+    <div class="mc"><div class="mc-l">物流车辆固定成本</div><div class="mc-v" style="color:var(--purple)">60.00</div><div class="mc-s">元 · 4辆固定费</div></div>
+    <div class="mc"><div class="mc-l">惩罚成本</div><div class="mc-v" style="color:var(--red)">42.41</div><div class="mc-s">元 · 超时惩罚</div></div>
+  </div>
+  <div class="g2">
+    <div class="cc"><h3>三种模式成本构成对比</h3><canvas id="ov-cost"></canvas></div>
+    <div class="cc"><h3>公交容量对总成本的影响</h3><canvas id="ov-trend"></canvas></div>
+  </div>
+  <div class="g2">
+    <div class="cc"><h3>订单重量分布</h3><canvas id="ord-w"></canvas></div>
+    <div class="cc"><h3>超时时间分布</h3><canvas id="ord-ot"></canvas></div>
+  </div>
+  <div class="cc gf"><h3>订单运输模式分配</h3><canvas id="rt-mode"></canvas></div>
+</div>
+
+<!-- ===== ROUTE PATH ===== -->
+<div class="page" id="page-routePath">
+  <div class="sec">实际配送路径 <small>物流专车 · 公交捎带 · 众包车辆</small></div>
+  <div class="map-wrap" id="map-wrap2">
+    <div class="map-title">配送路径分配图（km）</div>
+    <canvas id="map-canvas2"></canvas>
+    <div class="map-legend">
+      <div class="ml-title">图例</div>
+      <div class="ml-item"><div class="ml-tri"></div>县域配送中心</div>
+      <div class="ml-item"><div class="ml-dot" style="background:var(--blue);box-shadow:0 0 4px var(--blue)"></div>乡镇级站点</div>
+      <div class="ml-item"><div class="ml-dot" style="background:var(--ink5)"></div>村级站点</div>
+      <div style="margin-top:5px;border-top:1px solid var(--bd);padding-top:7px">
+      <div class="ml-title" style="margin-bottom:4px">配送模式</div>
+      <div class="ml-item"><div class="ml-line" style="background:#2966c4"></div>物流专车</div>
+      <div class="ml-item"><div class="ml-line" style="background:#1a854a"></div>公交捎带</div>
+      <div class="ml-item"><div class="ml-line" style="background:#c27d1a;opacity:.6;height:1px;border-top:1.5px dashed #c27d1a"></div>众包车辆</div>
+      </div>
+    </div>
+    <div class="map-controls">
+      <div class="mc-btn on" style="--c:#2966c4" onclick="toggleRoute2('log',this)">物流</div>
+      <div class="mc-btn on" style="--c:#1a854a" onclick="toggleRoute2('bus',this)">公交</div>
+      <div class="mc-btn on" style="--c:#c27d1a" onclick="toggleRoute2('crowd',this)">众包</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ROUTE ORDERS ===== -->
+<div class="page" id="page-routeOrders">
+  <div class="sec">订单明细 <small>200条订单 · 190已服务 · 10未服务</small></div>
+  <div class="tc">
+    <div class="th">
+      <h3>订单列表 <span id="ord-cnt" style="color:var(--red);margin-left:5px"></span></h3>
+      <div class="fr">
+        <input id="ord-s" class="fi" placeholder="搜索编号/站点…" oninput="filterOrd()">
+        <select id="ord-m" class="fs" onchange="filterOrd()">
+          <option value="">全部模式</option>
+          <option value="logistics">物流专车</option>
+          <option value="bus">公交捎带</option>
+          <option value="crowd">众包车辆</option>
+          <option value="unserved">未服务</option>
+        </select>
+        <select id="ord-of" class="fs" onchange="filterOrd()">
+          <option value="">全部</option>
+          <option value="overtime">仅超时</option>
+          <option value="ontime">仅准时</option>
+        </select>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>#</th><th>模式</th><th>车辆</th><th>班次</th><th>起→终</th><th>重量</th><th>最晚</th><th>送达</th><th>状态</th></tr></thead>
+      <tbody id="ord-tb"></tbody>
+    </table></div>
+    <div class="pr">
+      <span class="pi" id="ord-pi"></span>
+      <div style="display:flex;gap:4px" id="ord-pb"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BUS CAPACITY ===== -->
+<div class="page" id="page-busCap">
+  <div class="sec">公交容量敏感性分析</div>
+  <div class="sr"><span class="sl">容量：</span>
+    <button class="sb" onclick="selCap(50,this)">50</button>
+    <button class="sb active" onclick="selCap(100,this)">100</button>
+    <button class="sb" onclick="selCap(150,this)">150</button>
+    <button class="sb" onclick="selCap(200,this)">200</button>
+  </div>
+  <div class="mts" id="cap-kpi"></div>
+  <div class="g2">
+    <div class="cc"><h3>成本分项构成</h3><canvas id="cap-cost"></canvas></div>
+    <div class="cc"><h3>订单运输模式分配</h3><canvas id="cap-ord"></canvas></div>
+  </div>
+  <div class="cc gf"><h3>四种容量方案完整对比</h3><canvas id="cap-all" style="max-height:220px"></canvas></div>
+  <div class="tc"><div class="th"><h3>各容量方案汇总</h3></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>容量</th><th>众包</th><th>公交</th><th>物流</th><th>固定</th><th>超时</th><th>总成本</th><th>物流单</th><th>公交单</th><th>众包单</th><th>未完成</th></tr></thead>
+      <tbody id="cap-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ===== MODEL ===== -->
+<div class="page" id="page-model">
+  <div class="sec">配送模式对比分析</div>
+  <div class="mts">
+    <div class="mc"><div class="mc-l">传统物流</div><div class="mc-v" style="color:var(--red)">434.6</div><div class="mc-s">元</div></div>
+    <div class="mc"><div class="mc-l">客货邮模式</div><div class="mc-v" style="color:var(--blue)">220.4</div><div class="mc-s">元 · 节省 49.3%</div></div>
+    <div class="mc"><div class="mc-l">城乡共同配送</div><div class="mc-v" style="color:var(--green)">259.95</div><div class="mc-s">元 · 节省 40.2%</div></div>
+  </div>
+  <div class="g2">
+    <div class="cc"><h3>三种模式总成本对比</h3><canvas id="mod-total"></canvas></div>
+    <div class="cc"><h3>未服务客户需求数量对比</h3><canvas id="mod-unserved"></canvas></div>
+  </div>
+  <div class="cc gf"><h3>成本结构横向对比</h3><canvas id="mod-stack" style="max-height:190px"></canvas></div>
+</div>
+
+<!-- ===== PENALTY ===== -->
+<div class="page" id="page-penalty">
+  <div class="sec">超时惩罚系数 λ 敏感性分析</div>
+  <div class="g2">
+    <div class="cc"><h3>λ vs 总成本</h3><canvas id="pen-total"></canvas></div>
+    <div class="cc"><h3>超时成本 vs 固定成本消长</h3><canvas id="pen-breakdown"></canvas></div>
+  </div>
+  <div class="cc gf"><h3>各λ成本分项堆叠</h3><canvas id="pen-stack" style="max-height:190px"></canvas></div>
+  <div class="g2">
+    <div class="cc"><h3>各λ运输模式订单量</h3><canvas id="pen-modes"></canvas></div>
+    <div class="cc"><h3>λ vs 物流车数量</h3><canvas id="pen-vehs"></canvas></div>
+  </div>
+  <div class="tc"><div class="th"><h3>惩罚系数数据</h3></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>λ</th><th>众包</th><th>公交</th><th>物流</th><th>固定</th><th>超时</th><th>总成本</th><th>物流单</th><th>公交单</th><th>众包单</th></tr></thead>
+      <tbody id="pen-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ===== ORDERS ===== -->
+<div class="page" id="page-orders">
+  <div class="sec">客户需求分析 <small>100容量基准 · 200条</small></div>
+  <div class="mts">
+    <div class="mc"><div class="mc-l">下行总重量</div><div class="mc-v" style="color:var(--blue)" id="d-ft">—</div><div class="mc-s">kg · 下行配送</div></div>
+    <div class="mc"><div class="mc-l">上行总重量</div><div class="mc-v" style="color:var(--green)" id="d-tt">—</div><div class="mc-s">kg · 上行回收</div></div>
+    <div class="mc"><div class="mc-l">下行均重</div><div class="mc-v" style="color:var(--amber)" id="d-av">—</div><div class="mc-s">kg / 单</div></div>
+    <div class="mc"><div class="mc-l">活跃站点</div><div class="mc-v" style="color:var(--ink2)" id="d-st">—</div><div class="mc-s">个覆盖站点</div></div>
+  </div>
+  <div class="sr"><span class="sl">需求方向：</span>
+    <button class="sb active" onclick="selDemand('from',this)">下行</button>
+    <button class="sb" onclick="selDemand('to',this)">上行</button>
+  </div>
+  <div class="g2">
+    <div class="cc" style="min-height:420px"><h3 id="d-bt">各站点订单数量</h3><canvas id="d-bar" style="max-height:400px;height:380px"></canvas></div>
+    <div class="cc" style="min-height:420px"><h3 id="d-wt">各站点需求重量(kg)</h3><canvas id="d-weight" style="max-height:400px;height:380px"></canvas></div>
+  </div>
+  <div class="g2">
+    <div class="cc"><h3>订单重量分布</h3><canvas id="d-hist"></canvas></div>
+    <div class="cc"><h3>时间窗分布</h3><canvas id="d-tw"></canvas></div>
+  </div>
+  <div class="tc"><div class="th"><h3>各站点需求汇总</h3></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>站点</th><th>订单数</th><th>总重量</th><th>均重</th><th>最早时间窗</th><th>最晚时间窗</th></tr></thead>
+      <tbody id="d-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ===== WEIGHT ===== -->
+<div class="page" id="page-weight">
+  <div class="sec">客户需求重量敏感性分析 <small>N(μ, 8²), μ=10/20/30/40</small></div>
+  <div class="mts">
+    <div class="mc"><div class="mc-l">μ=10 总成本</div><div class="mc-v" style="color:var(--green)">124.4</div><div class="mc-s">元 · 最低成本</div></div>
+    <div class="mc"><div class="mc-l">μ=20 总成本</div><div class="mc-v" style="color:var(--blue)">253.4</div><div class="mc-s">元 · +104%</div></div>
+    <div class="mc"><div class="mc-l">μ=30 总成本</div><div class="mc-v" style="color:var(--amber)">360.4</div><div class="mc-s">元 · +55%</div></div>
+    <div class="mc"><div class="mc-l">μ=40 总成本</div><div class="mc-v" style="color:var(--red)">481.9</div><div class="mc-s">元 · +23%</div></div>
+  </div>
+  <div class="g2">
+    <div class="cc"><h3>总配送成本随需求重量变化</h3><canvas id="wt-total"></canvas></div>
+    <div class="cc"><h3>各车辆服务客户需求数量</h3><canvas id="wt-orders"></canvas></div>
+  </div>
+  <div class="g2">
+    <div class="cc"><h3>成本分项构成对比</h3><canvas id="wt-stack"></canvas></div>
+    <div class="cc"><h3>未服务客户需求数量</h3><canvas id="wt-unserved"></canvas></div>
+  </div>
+  <div class="cc gf"><h3>各均值下运力分配占比</h3><canvas id="wt-ratio" style="max-height:220px"></canvas></div>
+  <div class="tc"><div class="th"><h3>需求重量敏感性汇总</h3></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>均值μ</th><th>众包成本</th><th>公交成本</th><th>物流成本</th><th>固定成本</th><th>超时成本</th><th>总成本</th><th>物流单</th><th>公交单</th><th>众包单</th><th>未服务</th><th>物流车</th></tr></thead>
+      <tbody id="wt-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+</div>
+<script>
+// DATA
+const WEIGHT={"10":{"crowd":47.13,"bus":19.34,"log":22.42,"fixed":30.0,"ot":5.49,"total":124.37,"lo":31,"bo":88,"co":80,"un":1,"v":1},"20":{"crowd":45.45,"bus":39.08,"log":62.07,"fixed":60.0,"ot":46.75,"total":253.35,"lo":64,"bo":78,"co":45,"un":13,"v":3},"30":{"crowd":42.99,"bus":38.17,"log":77.07,"fixed":60.0,"ot":142.13,"total":360.37,"lo":57,"bo":67,"co":25,"un":51,"v":2},"40":{"crowd":34.18,"bus":28.81,"log":172.44,"fixed":120.0,"ot":126.45,"total":481.88,"lo":94,"bo":40,"co":16,"un":50,"v":4}};
+const ORDERS=[{"id":1,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":328,"tw_fmt":"13:28","dt":14,"dt_fmt":"8:14","from":0,"to":10,"weight":24},{"id":2,"mode":"bus","veh":"5","trip":"3","overtime":32,"tw":382,"tw_fmt":"14:22","dt":414,"dt_fmt":"14:54","from":0,"to":10,"weight":24},{"id":3,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":202,"tw_fmt":"11:22","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":28},{"id":4,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":421,"tw_fmt":"15:01","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":28},{"id":5,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":347,"tw_fmt":"13:47","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":14},{"id":6,"mode":"logistics","veh":"4","trip":"1","overtime":0,"tw":267,"tw_fmt":"12:27","dt":64,"dt_fmt":"09:04","from":0,"to":17,"weight":13},{"id":7,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":292,"tw_fmt":"12:52","dt":13,"dt_fmt":"8:13","from":0,"to":6,"weight":20},{"id":8,"mode":"logistics","veh":"1","trip":"1","overtime":0,"tw":318,"tw_fmt":"13:18","dt":45,"dt_fmt":"08:45","from":0,"to":22,"weight":15},{"id":9,"mode":"crowd","veh":"1","trip":"--","overtime":0,"tw":318,"tw_fmt":"13:18","dt":37,"dt_fmt":"08:37","from":0,"to":22,"weight":32},{"id":10,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":372,"tw_fmt":"14:12","dt":1000,"dt_fmt":"—","from":0,"to":23,"weight":31},{"id":11,"mode":"bus","veh":"2","trip":"2","overtime":0,"tw":365,"tw_fmt":"14:05","dt":258,"dt_fmt":"12:18","from":0,"to":14,"weight":21},{"id":12,"mode":"bus","veh":"3","trip":"2","overtime":0,"tw":278,"tw_fmt":"12:38","dt":204,"dt_fmt":"11:24","from":0,"to":5,"weight":17},{"id":13,"mode":"bus","veh":"3","trip":"2","overtime":0,"tw":292,"tw_fmt":"12:52","dt":204,"dt_fmt":"11:24","from":0,"to":5,"weight":24},{"id":14,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":344,"tw_fmt":"13:44","dt":48,"dt_fmt":"8:48","from":0,"to":17,"weight":15},{"id":15,"mode":"logistics","veh":"1","trip":"2","overtime":71,"tw":307,"tw_fmt":"13:07","dt":378,"dt_fmt":"14:18","from":0,"to":22,"weight":19},{"id":16,"mode":"bus","veh":"2","trip":"2","overtime":0,"tw":368,"tw_fmt":"14:08","dt":213,"dt_fmt":"11:33","from":0,"to":6,"weight":16},{"id":17,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":259,"tw_fmt":"12:19","dt":57,"dt_fmt":"8:57","from":0,"to":11,"weight":21},{"id":18,"mode":"bus","veh":"5","trip":"2","overtime":0,"tw":328,"tw_fmt":"13:28","dt":248,"dt_fmt":"12:08","from":0,"to":17,"weight":29},{"id":19,"mode":"logistics","veh":"1","trip":"2","overtime":61,"tw":317,"tw_fmt":"13:17","dt":378,"dt_fmt":"14:18","from":0,"to":22,"weight":26},{"id":20,"mode":"bus","veh":"1","trip":"2","overtime":0,"tw":384,"tw_fmt":"14:24","dt":210,"dt_fmt":"11:30","from":0,"to":2,"weight":29},{"id":21,"mode":"crowd","veh":"7","trip":"--","overtime":0,"tw":219,"tw_fmt":"11:39","dt":1,"dt_fmt":"08:01","from":0,"to":20,"weight":13},{"id":22,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":300,"tw_fmt":"13:00","dt":48,"dt_fmt":"8:48","from":0,"to":17,"weight":21},{"id":23,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":303,"tw_fmt":"13:03","dt":14,"dt_fmt":"8:14","from":0,"to":10,"weight":12},{"id":24,"mode":"crowd","veh":"1","trip":"--","overtime":0,"tw":159,"tw_fmt":"10:39","dt":1,"dt_fmt":"08:01","from":0,"to":22,"weight":23},{"id":25,"mode":"bus","veh":"3","trip":"2","overtime":0,"tw":375,"tw_fmt":"14:15","dt":218,"dt_fmt":"11:38","from":0,"to":7,"weight":23},{"id":26,"mode":"bus","veh":"1","trip":"1","overtime":0,"tw":469,"tw_fmt":"15:49","dt":10,"dt_fmt":"8:10","from":0,"to":2,"weight":30},{"id":27,"mode":"bus","veh":"5","trip":"3","overtime":162,"tw":286,"tw_fmt":"12:46","dt":448,"dt_fmt":"15:28","from":0,"to":17,"weight":29},{"id":28,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":317,"tw_fmt":"13:17","dt":48,"dt_fmt":"8:48","from":0,"to":17,"weight":25},{"id":29,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":272,"tw_fmt":"12:32","dt":13,"dt_fmt":"8:13","from":0,"to":6,"weight":16},{"id":30,"mode":"logistics","veh":"1","trip":"1","overtime":0,"tw":323,"tw_fmt":"13:23","dt":45,"dt_fmt":"08:45","from":0,"to":22,"weight":16},{"id":31,"mode":"crowd","veh":"10","trip":"--","overtime":0,"tw":277,"tw_fmt":"12:37","dt":55,"dt_fmt":"08:55","from":0,"to":25,"weight":4},{"id":32,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":294,"tw_fmt":"12:54","dt":34,"dt_fmt":"8:34","from":0,"to":24,"weight":16},{"id":33,"mode":"crowd","veh":"2","trip":"--","overtime":0,"tw":397,"tw_fmt":"14:37","dt":16,"dt_fmt":"08:16","from":0,"to":1,"weight":8},{"id":34,"mode":"logistics","veh":"3","trip":"2","overtime":90,"tw":249,"tw_fmt":"12:09","dt":339,"dt_fmt":"13:39","from":0,"to":5,"weight":27},{"id":35,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":265,"tw_fmt":"12:25","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":27},{"id":36,"mode":"logistics","veh":"4","trip":"2","overtime":102,"tw":295,"tw_fmt":"12:55","dt":397,"dt_fmt":"14:37","from":0,"to":17,"weight":21},{"id":37,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":292,"tw_fmt":"12:52","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":17},{"id":38,"mode":"crowd","veh":"3","trip":"--","overtime":0,"tw":386,"tw_fmt":"14:26","dt":11,"dt_fmt":"08:11","from":0,"to":8,"weight":21},{"id":39,"mode":"logistics","veh":"1","trip":"3","overtime":290,"tw":422,"tw_fmt":"15:02","dt":712,"dt_fmt":"19:52","from":0,"to":22,"weight":33},{"id":40,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":241,"tw_fmt":"12:01","dt":1000,"dt_fmt":"—","from":0,"to":17,"weight":31},{"id":41,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":262,"tw_fmt":"12:22","dt":13,"dt_fmt":"8:13","from":0,"to":6,"weight":16},{"id":42,"mode":"bus","veh":"1","trip":"1","overtime":18,"tw":331,"tw_fmt":"13:31","dt":21,"dt_fmt":"8:21","from":0,"to":4,"weight":21},{"id":43,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":277,"tw_fmt":"12:37","dt":57,"dt_fmt":"8:57","from":0,"to":11,"weight":11},{"id":44,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":420,"tw_fmt":"15:00","dt":1000,"dt_fmt":"—","from":0,"to":23,"weight":23},{"id":45,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":398,"tw_fmt":"14:38","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":26},{"id":46,"mode":"crowd","veh":"7","trip":"--","overtime":0,"tw":334,"tw_fmt":"13:34","dt":13,"dt_fmt":"08:13","from":0,"to":12,"weight":27},{"id":47,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":334,"tw_fmt":"13:34","dt":22,"dt_fmt":"08:22","from":0,"to":22,"weight":8},{"id":48,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":280,"tw_fmt":"12:40","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":24},{"id":49,"mode":"crowd","veh":"3","trip":"--","overtime":0,"tw":346,"tw_fmt":"13:46","dt":1,"dt_fmt":"08:01","from":0,"to":19,"weight":13},{"id":50,"mode":"bus","veh":"3","trip":"2","overtime":0,"tw":368,"tw_fmt":"14:08","dt":234,"dt_fmt":"11:54","from":0,"to":24,"weight":17},{"id":51,"mode":"bus","veh":"2","trip":"2","overtime":0,"tw":308,"tw_fmt":"13:08","dt":213,"dt_fmt":"11:33","from":0,"to":6,"weight":26},{"id":52,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":416,"tw_fmt":"14:56","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":22},{"id":53,"mode":"crowd","veh":"2","trip":"--","overtime":0,"tw":340,"tw_fmt":"13:40","dt":34,"dt_fmt":"08:34","from":0,"to":18,"weight":19},{"id":54,"mode":"logistics","veh":"1","trip":"1","overtime":0,"tw":293,"tw_fmt":"12:53","dt":45,"dt_fmt":"08:45","from":0,"to":22,"weight":25},{"id":55,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":322,"tw_fmt":"13:22","dt":1000,"dt_fmt":"—","from":0,"to":17,"weight":33},{"id":56,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":366,"tw_fmt":"14:06","dt":22,"dt_fmt":"8:22","from":0,"to":22,"weight":15},{"id":57,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":276,"tw_fmt":"12:36","dt":22,"dt_fmt":"8:22","from":0,"to":3,"weight":9},{"id":58,"mode":"crowd","veh":"8","trip":"--","overtime":0,"tw":295,"tw_fmt":"12:55","dt":1,"dt_fmt":"08:01","from":0,"to":21,"weight":11},{"id":59,"mode":"bus","veh":"2","trip":"2","overtime":0,"tw":442,"tw_fmt":"15:22","dt":213,"dt_fmt":"11:33","from":0,"to":6,"weight":12},{"id":60,"mode":"crowd","veh":"5","trip":"--","overtime":0,"tw":272,"tw_fmt":"12:32","dt":27,"dt_fmt":"08:27","from":0,"to":9,"weight":15},{"id":61,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":357,"tw_fmt":"13:57","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":25},{"id":62,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":349,"tw_fmt":"13:49","dt":22,"dt_fmt":"08:22","from":0,"to":22,"weight":3},{"id":63,"mode":"bus","veh":"5","trip":"2","overtime":0,"tw":395,"tw_fmt":"14:35","dt":248,"dt_fmt":"12:08","from":0,"to":17,"weight":22},{"id":64,"mode":"crowd","veh":"5","trip":"--","overtime":0,"tw":332,"tw_fmt":"13:32","dt":13,"dt_fmt":"08:13","from":0,"to":21,"weight":14},{"id":65,"mode":"crowd","veh":"8","trip":"--","overtime":0,"tw":152,"tw_fmt":"10:32","dt":38,"dt_fmt":"08:38","from":0,"to":22,"weight":29},{"id":66,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":249,"tw_fmt":"12:09","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":13},{"id":67,"mode":"crowd","veh":"4","trip":"--","overtime":0,"tw":331,"tw_fmt":"13:31","dt":32,"dt_fmt":"08:32","from":0,"to":23,"weight":20},{"id":68,"mode":"bus","veh":"2","trip":"1","overtime":22,"tw":315,"tw_fmt":"13:15","dt":58,"dt_fmt":"8:58","from":0,"to":14,"weight":12},{"id":69,"mode":"crowd","veh":"8","trip":"--","overtime":0,"tw":418,"tw_fmt":"14:58","dt":1,"dt_fmt":"08:01","from":0,"to":21,"weight":15},{"id":70,"mode":"crowd","veh":"5","trip":"--","overtime":0,"tw":384,"tw_fmt":"14:24","dt":13,"dt_fmt":"08:13","from":0,"to":21,"weight":18},{"id":71,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":330,"tw_fmt":"13:30","dt":22,"dt_fmt":"8:22","from":0,"to":22,"weight":18},{"id":72,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":305,"tw_fmt":"13:05","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":16},{"id":73,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":207,"tw_fmt":"11:27","dt":57,"dt_fmt":"8:57","from":0,"to":11,"weight":29},{"id":74,"mode":"bus","veh":"5","trip":"2","overtime":0,"tw":412,"tw_fmt":"14:52","dt":248,"dt_fmt":"12:08","from":0,"to":17,"weight":24},{"id":75,"mode":"crowd","veh":"5","trip":"--","overtime":0,"tw":308,"tw_fmt":"13:08","dt":40,"dt_fmt":"08:40","from":0,"to":22,"weight":35},{"id":76,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":207,"tw_fmt":"11:27","dt":22,"dt_fmt":"8:22","from":0,"to":22,"weight":18},{"id":77,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":326,"tw_fmt":"13:26","dt":22,"dt_fmt":"8:22","from":0,"to":22,"weight":29},{"id":78,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":306,"tw_fmt":"13:06","dt":48,"dt_fmt":"8:48","from":0,"to":17,"weight":3},{"id":79,"mode":"bus","veh":"5","trip":"2","overtime":0,"tw":266,"tw_fmt":"12:26","dt":248,"dt_fmt":"12:08","from":0,"to":17,"weight":25},{"id":80,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":330,"tw_fmt":"13:30","dt":22,"dt_fmt":"8:22","from":0,"to":22,"weight":23},{"id":81,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":258,"tw_fmt":"12:18","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":17},{"id":82,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":219,"tw_fmt":"11:39","dt":22,"dt_fmt":"8:22","from":0,"to":22,"weight":26},{"id":83,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":195,"tw_fmt":"11:15","dt":1000,"dt_fmt":"—","from":0,"to":8,"weight":27},{"id":84,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":278,"tw_fmt":"12:38","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":28},{"id":85,"mode":"crowd","veh":"8","trip":"--","overtime":0,"tw":262,"tw_fmt":"12:22","dt":1,"dt_fmt":"08:01","from":0,"to":21,"weight":23},{"id":86,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":326,"tw_fmt":"13:26","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":25},{"id":87,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":210,"tw_fmt":"11:30","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":15},{"id":88,"mode":"logistics","veh":"4","trip":"--","overtime":0,"tw":288,"tw_fmt":"12:48","dt":29,"dt_fmt":"8:29","from":0,"to":17,"weight":11},{"id":89,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":210,"tw_fmt":"11:30","dt":13,"dt_fmt":"8:13","from":0,"to":6,"weight":18},{"id":90,"mode":"bus","veh":"2","trip":"2","overtime":0,"tw":409,"tw_fmt":"14:49","dt":213,"dt_fmt":"11:33","from":0,"to":6,"weight":21},{"id":91,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":293,"tw_fmt":"12:53","dt":1000,"dt_fmt":"—","from":0,"to":8,"weight":28},{"id":92,"mode":"crowd","veh":"3","trip":"--","overtime":0,"tw":374,"tw_fmt":"14:14","dt":11,"dt_fmt":"08:11","from":0,"to":8,"weight":14},{"id":93,"mode":"bus","veh":"3","trip":"2","overtime":15,"tw":330,"tw_fmt":"13:30","dt":218,"dt_fmt":"11:38","from":0,"to":7,"weight":16},{"id":94,"mode":"bus","veh":"5","trip":"3","overtime":93,"tw":355,"tw_fmt":"13:55","dt":448,"dt_fmt":"15:28","from":0,"to":17,"weight":40},{"id":95,"mode":"crowd","veh":"6","trip":"--","overtime":0,"tw":231,"tw_fmt":"11:51","dt":1,"dt_fmt":"08:01","from":0,"to":2,"weight":15},{"id":96,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":375,"tw_fmt":"14:15","dt":22,"dt_fmt":"8:22","from":0,"to":3,"weight":35},{"id":97,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":387,"tw_fmt":"14:27","dt":10,"dt_fmt":"08:10","from":0,"to":1,"weight":28},{"id":98,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":175,"tw_fmt":"10:55","dt":13,"dt_fmt":"8:13","from":0,"to":6,"weight":16},{"id":99,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":289,"tw_fmt":"12:49","dt":22,"dt_fmt":"08:22","from":0,"to":22,"weight":19},{"id":100,"mode":"bus","veh":"3","trip":"1","overtime":12,"tw":261,"tw_fmt":"12:21","dt":4,"dt_fmt":"8:04","from":0,"to":5,"weight":18},{"id":101,"mode":"bus","veh":"5","trip":"3","overtime":64,"tw":397,"tw_fmt":"14:37","dt":461,"dt_fmt":"15:41","from":17,"to":0,"weight":23},{"id":102,"mode":"logistics","veh":"3","trip":"--","overtime":0,"tw":251,"tw_fmt":"12:11","dt":4,"dt_fmt":"8:04","from":5,"to":0,"weight":11},{"id":103,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":180,"tw_fmt":"11:00","dt":61,"dt_fmt":"9:01","from":17,"to":0,"weight":25},{"id":104,"mode":"bus","veh":"5","trip":"2","overtime":6,"tw":255,"tw_fmt":"12:15","dt":261,"dt_fmt":"12:21","from":17,"to":0,"weight":26},{"id":105,"mode":"bus","veh":"5","trip":"3","overtime":173,"tw":288,"tw_fmt":"12:48","dt":461,"dt_fmt":"15:41","from":17,"to":0,"weight":28},{"id":106,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":278,"tw_fmt":"12:38","dt":57,"dt_fmt":"8:57","from":11,"to":0,"weight":20},{"id":107,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":249,"tw_fmt":"12:09","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":25},{"id":108,"mode":"bus","veh":"2","trip":"3","overtime":95,"tw":380,"tw_fmt":"14:20","dt":475,"dt_fmt":"15:55","from":15,"to":0,"weight":34},{"id":109,"mode":"crowd","veh":"3","trip":"--","overtime":0,"tw":203,"tw_fmt":"11:23","dt":35,"dt_fmt":"08:35","from":8,"to":0,"weight":20},{"id":110,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":270,"tw_fmt":"12:30","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":19},{"id":111,"mode":"bus","veh":"3","trip":"2","overtime":15,"tw":242,"tw_fmt":"12:02","dt":257,"dt_fmt":"12:17","from":11,"to":0,"weight":34},{"id":112,"mode":"logistics","veh":"3","trip":"--","overtime":0,"tw":272,"tw_fmt":"12:32","dt":34,"dt_fmt":"8:34","from":11,"to":0,"weight":2},{"id":113,"mode":"logistics","veh":"4","trip":"--","overtime":0,"tw":260,"tw_fmt":"12:20","dt":29,"dt_fmt":"8:29","from":17,"to":0,"weight":16},{"id":114,"mode":"crowd","veh":"1","trip":"--","overtime":0,"tw":329,"tw_fmt":"13:29","dt":37,"dt_fmt":"08:37","from":22,"to":0,"weight":39},{"id":115,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":238,"tw_fmt":"11:58","dt":84,"dt_fmt":"9:24","from":19,"to":0,"weight":16},{"id":116,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":251,"tw_fmt":"12:11","dt":38,"dt_fmt":"08:38","from":22,"to":0,"weight":16},{"id":117,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":306,"tw_fmt":"13:06","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":10},{"id":118,"mode":"logistics","veh":"3","trip":"--","overtime":0,"tw":365,"tw_fmt":"14:05","dt":4,"dt_fmt":"8:04","from":5,"to":0,"weight":26},{"id":119,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":189,"tw_fmt":"11:09","dt":57,"dt_fmt":"8:57","from":11,"to":0,"weight":3},{"id":120,"mode":"crowd","veh":"4","trip":"--","overtime":0,"tw":408,"tw_fmt":"14:48","dt":70,"dt_fmt":"09:10","from":23,"to":0,"weight":14},{"id":121,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":247,"tw_fmt":"12:07","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":25},{"id":122,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":339,"tw_fmt":"13:39","dt":57,"dt_fmt":"8:57","from":11,"to":0,"weight":20},{"id":123,"mode":"bus","veh":"2","trip":"2","overtime":0,"tw":363,"tw_fmt":"14:03","dt":304,"dt_fmt":"13:04","from":6,"to":0,"weight":25},{"id":124,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":379,"tw_fmt":"14:19","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":21},{"id":125,"mode":"crowd","veh":"14","trip":"--","overtime":0,"tw":269,"tw_fmt":"12:29","dt":45,"dt_fmt":"08:45","from":21,"to":0,"weight":25},{"id":126,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":301,"tw_fmt":"13:01","dt":75,"dt_fmt":"9:15","from":15,"to":0,"weight":10},{"id":127,"mode":"crowd","veh":"6","trip":"--","overtime":0,"tw":290,"tw_fmt":"12:50","dt":42,"dt_fmt":"08:42","from":3,"to":0,"weight":22},{"id":128,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":264,"tw_fmt":"12:24","dt":95,"dt_fmt":"9:35","from":10,"to":0,"weight":7},{"id":129,"mode":"bus","veh":"1","trip":"1","overtime":8,"tw":316,"tw_fmt":"13:16","dt":86,"dt_fmt":"9:26","from":2,"to":0,"weight":26},{"id":130,"mode":"crowd","veh":"5","trip":"--","overtime":0,"tw":322,"tw_fmt":"13:22","dt":69,"dt_fmt":"09:09","from":21,"to":0,"weight":18},{"id":131,"mode":"bus","veh":"2","trip":"2","overtime":25,"tw":279,"tw_fmt":"12:39","dt":304,"dt_fmt":"13:04","from":6,"to":0,"weight":25},{"id":132,"mode":"crowd","veh":"4","trip":"--","overtime":0,"tw":308,"tw_fmt":"13:08","dt":70,"dt_fmt":"09:10","from":23,"to":0,"weight":16},{"id":133,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":460,"tw_fmt":"15:40","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":23},{"id":134,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":300,"tw_fmt":"13:00","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":28},{"id":135,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":343,"tw_fmt":"13:43","dt":61,"dt_fmt":"9:01","from":17,"to":0,"weight":4},{"id":136,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":272,"tw_fmt":"12:32","dt":61,"dt_fmt":"9:01","from":17,"to":0,"weight":5},{"id":137,"mode":"logistics","veh":"4","trip":"--","overtime":0,"tw":268,"tw_fmt":"12:28","dt":29,"dt_fmt":"8:29","from":17,"to":0,"weight":5},{"id":138,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":279,"tw_fmt":"12:39","dt":1000,"dt_fmt":"—","from":20,"to":0,"weight":27},{"id":139,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":334,"tw_fmt":"13:34","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":23},{"id":140,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":252,"tw_fmt":"12:12","dt":38,"dt_fmt":"08:38","from":22,"to":0,"weight":14},{"id":141,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":189,"tw_fmt":"11:09","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":32},{"id":142,"mode":"bus","veh":"2","trip":"3","overtime":201,"tw":303,"tw_fmt":"13:03","dt":504,"dt_fmt":"16:24","from":6,"to":0,"weight":21},{"id":143,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":274,"tw_fmt":"12:34","dt":91,"dt_fmt":"9:31","from":3,"to":0,"weight":7},{"id":144,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":317,"tw_fmt":"13:17","dt":37,"dt_fmt":"08:37","from":22,"to":0,"weight":12},{"id":145,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":305,"tw_fmt":"13:05","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":9},{"id":146,"mode":"bus","veh":"5","trip":"3","overtime":117,"tw":344,"tw_fmt":"13:44","dt":461,"dt_fmt":"15:41","from":17,"to":0,"weight":28},{"id":147,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":354,"tw_fmt":"13:54","dt":61,"dt_fmt":"9:01","from":17,"to":0,"weight":15},{"id":148,"mode":"logistics","veh":"4","trip":"--","overtime":0,"tw":220,"tw_fmt":"11:40","dt":29,"dt_fmt":"8:29","from":17,"to":0,"weight":11},{"id":149,"mode":"crowd","veh":"1","trip":"--","overtime":0,"tw":209,"tw_fmt":"11:29","dt":37,"dt_fmt":"08:37","from":22,"to":0,"weight":15},{"id":150,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":330,"tw_fmt":"13:30","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":13},{"id":151,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":318,"tw_fmt":"13:18","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":27},{"id":152,"mode":"bus","veh":"2","trip":"2","overtime":39,"tw":244,"tw_fmt":"12:04","dt":283,"dt_fmt":"12:43","from":16,"to":0,"weight":24},{"id":153,"mode":"bus","veh":"5","trip":"2","overtime":16,"tw":374,"tw_fmt":"14:14","dt":284,"dt_fmt":"12:44","from":19,"to":0,"weight":22},{"id":154,"mode":"crowd","veh":"1","trip":"--","overtime":0,"tw":302,"tw_fmt":"13:02","dt":37,"dt_fmt":"08:37","from":4,"to":0,"weight":23},{"id":155,"mode":"bus","veh":"5","trip":"3","overtime":154,"tw":307,"tw_fmt":"13:07","dt":461,"dt_fmt":"15:41","from":17,"to":0,"weight":20},{"id":156,"mode":"crowd","veh":"3","trip":"--","overtime":0,"tw":316,"tw_fmt":"13:16","dt":35,"dt_fmt":"08:35","from":19,"to":0,"weight":12},{"id":157,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":345,"tw_fmt":"13:45","dt":1000,"dt_fmt":"—","from":23,"to":0,"weight":24},{"id":158,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":391,"tw_fmt":"14:31","dt":57,"dt_fmt":"8:57","from":11,"to":0,"weight":13},{"id":159,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":284,"tw_fmt":"12:44","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":11},{"id":160,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":196,"tw_fmt":"11:16","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":11},{"id":161,"mode":"bus","veh":"5","trip":"2","overtime":0,"tw":361,"tw_fmt":"14:01","dt":261,"dt_fmt":"12:21","from":17,"to":0,"weight":27},{"id":162,"mode":"crowd","veh":"8","trip":"--","overtime":0,"tw":244,"tw_fmt":"12:04","dt":38,"dt_fmt":"08:38","from":22,"to":0,"weight":28},{"id":163,"mode":"bus","veh":"5","trip":"1","overtime":0,"tw":375,"tw_fmt":"14:15","dt":84,"dt_fmt":"9:24","from":19,"to":0,"weight":6},{"id":164,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":265,"tw_fmt":"12:25","dt":104,"dt_fmt":"9:44","from":6,"to":0,"weight":19},{"id":165,"mode":"crowd","veh":"4","trip":"--","overtime":0,"tw":389,"tw_fmt":"14:29","dt":50,"dt_fmt":"08:50","from":23,"to":0,"weight":22},{"id":166,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":252,"tw_fmt":"12:12","dt":83,"dt_fmt":"9:23","from":16,"to":0,"weight":15},{"id":167,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":233,"tw_fmt":"11:53","dt":1000,"dt_fmt":"—","from":23,"to":0,"weight":26},{"id":168,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":357,"tw_fmt":"13:57","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":22},{"id":169,"mode":"bus","veh":"1","trip":"1","overtime":10,"tw":218,"tw_fmt":"11:38","dt":75,"dt_fmt":"9:15","from":4,"to":0,"weight":19},{"id":170,"mode":"crowd","veh":"8","trip":"--","overtime":0,"tw":341,"tw_fmt":"13:41","dt":38,"dt_fmt":"08:38","from":22,"to":0,"weight":16},{"id":171,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":326,"tw_fmt":"13:26","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":25},{"id":172,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":291,"tw_fmt":"12:51","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":27},{"id":173,"mode":"bus","veh":"2","trip":"2","overtime":24,"tw":280,"tw_fmt":"12:40","dt":304,"dt_fmt":"13:04","from":6,"to":0,"weight":24},{"id":174,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":423,"tw_fmt":"15:03","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":18},{"id":175,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":278,"tw_fmt":"12:38","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":27},{"id":176,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":289,"tw_fmt":"12:49","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":13},{"id":177,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":244,"tw_fmt":"12:04","dt":104,"dt_fmt":"9:44","from":6,"to":0,"weight":21},{"id":178,"mode":"crowd","veh":"5","trip":"--","overtime":0,"tw":251,"tw_fmt":"12:11","dt":69,"dt_fmt":"09:09","from":5,"to":0,"weight":31},{"id":179,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":265,"tw_fmt":"12:25","dt":104,"dt_fmt":"9:44","from":6,"to":0,"weight":18},{"id":180,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":403,"tw_fmt":"14:43","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":13},{"id":181,"mode":"crowd","veh":"5","trip":"--","overtime":0,"tw":277,"tw_fmt":"12:37","dt":40,"dt_fmt":"08:40","from":22,"to":0,"weight":36},{"id":182,"mode":"logistics","veh":"4","trip":"--","overtime":0,"tw":259,"tw_fmt":"12:19","dt":29,"dt_fmt":"8:29","from":17,"to":0,"weight":18},{"id":183,"mode":"bus","veh":"5","trip":"2","overtime":0,"tw":273,"tw_fmt":"12:33","dt":261,"dt_fmt":"12:21","from":17,"to":0,"weight":24},{"id":184,"mode":"bus","veh":"2","trip":"3","overtime":161,"tw":343,"tw_fmt":"13:43","dt":504,"dt_fmt":"16:24","from":6,"to":0,"weight":14},{"id":185,"mode":"bus","veh":"5","trip":"1","overtime":14,"tw":221,"tw_fmt":"11:41","dt":84,"dt_fmt":"9:24","from":19,"to":0,"weight":22},{"id":186,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":338,"tw_fmt":"13:38","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":24},{"id":187,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":220,"tw_fmt":"11:40","dt":57,"dt_fmt":"8:57","from":11,"to":0,"weight":20},{"id":188,"mode":"bus","veh":"3","trip":"1","overtime":0,"tw":292,"tw_fmt":"12:52","dt":57,"dt_fmt":"8:57","from":11,"to":0,"weight":23},{"id":189,"mode":"crowd","veh":"7","trip":"--","overtime":0,"tw":190,"tw_fmt":"11:10","dt":38,"dt_fmt":"08:38","from":12,"to":0,"weight":30},{"id":190,"mode":"bus","veh":"2","trip":"1","overtime":0,"tw":332,"tw_fmt":"13:32","dt":104,"dt_fmt":"9:44","from":6,"to":0,"weight":9},{"id":191,"mode":"crowd","veh":"2","trip":"--","overtime":0,"tw":342,"tw_fmt":"13:42","dt":51,"dt_fmt":"08:51","from":18,"to":0,"weight":22},{"id":192,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":259,"tw_fmt":"12:19","dt":38,"dt_fmt":"08:38","from":22,"to":0,"weight":4},{"id":193,"mode":"logistics","veh":"1","trip":"--","overtime":0,"tw":319,"tw_fmt":"13:19","dt":22,"dt_fmt":"8:22","from":22,"to":0,"weight":20},{"id":194,"mode":"unserved","veh":"无","trip":"--","overtime":960,"tw":310,"tw_fmt":"13:10","dt":1000,"dt_fmt":"—","from":21,"to":0,"weight":35},{"id":195,"mode":"bus","veh":"2","trip":"3","overtime":134,"tw":370,"tw_fmt":"14:10","dt":504,"dt_fmt":"16:24","from":6,"to":0,"weight":28},{"id":196,"mode":"crowd","veh":"2","trip":"--","overtime":0,"tw":308,"tw_fmt":"13:08","dt":51,"dt_fmt":"08:51","from":18,"to":0,"weight":20},{"id":197,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":362,"tw_fmt":"14:02","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":17},{"id":198,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":293,"tw_fmt":"12:53","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":24},{"id":199,"mode":"crowd","veh":"6","trip":"--","overtime":0,"tw":261,"tw_fmt":"12:21","dt":42,"dt_fmt":"08:42","from":3,"to":0,"weight":28},{"id":200,"mode":"logistics","veh":"2","trip":"--","overtime":0,"tw":298,"tw_fmt":"12:58","dt":28,"dt_fmt":"08:28","from":1,"to":0,"weight":20}];
+
+const DEMAND_DATA={"from":[{"id":1,"station":10,"weight":24,"tw":328,"tw_fmt":"13:28"},{"id":2,"station":10,"weight":24,"tw":382,"tw_fmt":"14:22"},{"id":3,"station":1,"weight":28,"tw":202,"tw_fmt":"11:22"},{"id":4,"station":1,"weight":28,"tw":421,"tw_fmt":"15:01"},{"id":5,"station":1,"weight":14,"tw":347,"tw_fmt":"13:47"},{"id":6,"station":17,"weight":13,"tw":267,"tw_fmt":"12:27"},{"id":7,"station":6,"weight":20,"tw":292,"tw_fmt":"12:52"},{"id":8,"station":22,"weight":15,"tw":318,"tw_fmt":"13:18"},{"id":9,"station":22,"weight":32,"tw":318,"tw_fmt":"13:18"},{"id":10,"station":23,"weight":31,"tw":372,"tw_fmt":"14:12"},{"id":11,"station":14,"weight":21,"tw":365,"tw_fmt":"14:05"},{"id":12,"station":5,"weight":17,"tw":278,"tw_fmt":"12:38"},{"id":13,"station":5,"weight":24,"tw":292,"tw_fmt":"12:52"},{"id":14,"station":17,"weight":15,"tw":344,"tw_fmt":"13:44"},{"id":15,"station":22,"weight":19,"tw":307,"tw_fmt":"13:07"},{"id":16,"station":6,"weight":16,"tw":368,"tw_fmt":"14:08"},{"id":17,"station":11,"weight":21,"tw":259,"tw_fmt":"12:19"},{"id":18,"station":17,"weight":29,"tw":328,"tw_fmt":"13:28"},{"id":19,"station":22,"weight":26,"tw":317,"tw_fmt":"13:17"},{"id":20,"station":2,"weight":29,"tw":384,"tw_fmt":"14:24"},{"id":21,"station":20,"weight":13,"tw":219,"tw_fmt":"11:39"},{"id":22,"station":17,"weight":21,"tw":300,"tw_fmt":"13:00"},{"id":23,"station":10,"weight":12,"tw":303,"tw_fmt":"13:03"},{"id":24,"station":22,"weight":23,"tw":159,"tw_fmt":"10:39"},{"id":25,"station":7,"weight":23,"tw":375,"tw_fmt":"14:15"},{"id":26,"station":2,"weight":30,"tw":469,"tw_fmt":"15:49"},{"id":27,"station":17,"weight":29,"tw":286,"tw_fmt":"12:46"},{"id":28,"station":17,"weight":25,"tw":317,"tw_fmt":"13:17"},{"id":29,"station":6,"weight":16,"tw":272,"tw_fmt":"12:32"},{"id":30,"station":22,"weight":16,"tw":323,"tw_fmt":"13:23"},{"id":31,"station":25,"weight":4,"tw":277,"tw_fmt":"12:37"},{"id":32,"station":24,"weight":16,"tw":294,"tw_fmt":"12:54"},{"id":33,"station":1,"weight":8,"tw":397,"tw_fmt":"14:37"},{"id":34,"station":5,"weight":27,"tw":249,"tw_fmt":"12:09"},{"id":35,"station":1,"weight":27,"tw":265,"tw_fmt":"12:25"},{"id":36,"station":17,"weight":21,"tw":295,"tw_fmt":"12:55"},{"id":37,"station":1,"weight":17,"tw":292,"tw_fmt":"12:52"},{"id":38,"station":8,"weight":21,"tw":386,"tw_fmt":"14:26"},{"id":39,"station":22,"weight":33,"tw":422,"tw_fmt":"15:02"},{"id":40,"station":17,"weight":31,"tw":241,"tw_fmt":"12:01"},{"id":41,"station":6,"weight":16,"tw":262,"tw_fmt":"12:22"},{"id":42,"station":4,"weight":21,"tw":331,"tw_fmt":"13:31"},{"id":43,"station":11,"weight":11,"tw":277,"tw_fmt":"12:37"},{"id":44,"station":23,"weight":23,"tw":420,"tw_fmt":"15:00"},{"id":45,"station":1,"weight":26,"tw":398,"tw_fmt":"14:38"},{"id":46,"station":12,"weight":27,"tw":334,"tw_fmt":"13:34"},{"id":47,"station":22,"weight":8,"tw":334,"tw_fmt":"13:34"},{"id":48,"station":1,"weight":24,"tw":280,"tw_fmt":"12:40"},{"id":49,"station":19,"weight":13,"tw":346,"tw_fmt":"13:46"},{"id":50,"station":24,"weight":17,"tw":368,"tw_fmt":"14:08"},{"id":51,"station":6,"weight":26,"tw":308,"tw_fmt":"13:08"},{"id":52,"station":1,"weight":22,"tw":416,"tw_fmt":"14:56"},{"id":53,"station":18,"weight":19,"tw":340,"tw_fmt":"13:40"},{"id":54,"station":22,"weight":25,"tw":293,"tw_fmt":"12:53"},{"id":55,"station":17,"weight":33,"tw":322,"tw_fmt":"13:22"},{"id":56,"station":22,"weight":15,"tw":366,"tw_fmt":"14:06"},{"id":57,"station":3,"weight":9,"tw":276,"tw_fmt":"12:36"},{"id":58,"station":21,"weight":11,"tw":295,"tw_fmt":"12:55"},{"id":59,"station":6,"weight":12,"tw":442,"tw_fmt":"15:22"},{"id":60,"station":9,"weight":15,"tw":272,"tw_fmt":"12:32"},{"id":61,"station":1,"weight":25,"tw":357,"tw_fmt":"13:57"},{"id":62,"station":22,"weight":3,"tw":349,"tw_fmt":"13:49"},{"id":63,"station":17,"weight":22,"tw":395,"tw_fmt":"14:35"},{"id":64,"station":21,"weight":14,"tw":332,"tw_fmt":"13:32"},{"id":65,"station":22,"weight":29,"tw":152,"tw_fmt":"10:32"},{"id":66,"station":1,"weight":13,"tw":249,"tw_fmt":"12:09"},{"id":67,"station":23,"weight":20,"tw":331,"tw_fmt":"13:31"},{"id":68,"station":14,"weight":12,"tw":315,"tw_fmt":"13:15"},{"id":69,"station":21,"weight":15,"tw":418,"tw_fmt":"14:58"},{"id":70,"station":21,"weight":18,"tw":384,"tw_fmt":"14:24"},{"id":71,"station":22,"weight":18,"tw":330,"tw_fmt":"13:30"},{"id":72,"station":1,"weight":16,"tw":305,"tw_fmt":"13:05"},{"id":73,"station":11,"weight":29,"tw":207,"tw_fmt":"11:27"},{"id":74,"station":17,"weight":24,"tw":412,"tw_fmt":"14:52"},{"id":75,"station":22,"weight":35,"tw":308,"tw_fmt":"13:08"},{"id":76,"station":22,"weight":18,"tw":207,"tw_fmt":"11:27"},{"id":77,"station":22,"weight":29,"tw":326,"tw_fmt":"13:26"},{"id":78,"station":17,"weight":3,"tw":306,"tw_fmt":"13:06"},{"id":79,"station":17,"weight":25,"tw":266,"tw_fmt":"12:26"},{"id":80,"station":22,"weight":23,"tw":330,"tw_fmt":"13:30"},{"id":81,"station":1,"weight":17,"tw":258,"tw_fmt":"12:18"},{"id":82,"station":22,"weight":26,"tw":219,"tw_fmt":"11:39"},{"id":83,"station":8,"weight":27,"tw":195,"tw_fmt":"11:15"},{"id":84,"station":1,"weight":28,"tw":278,"tw_fmt":"12:38"},{"id":85,"station":21,"weight":23,"tw":262,"tw_fmt":"12:22"},{"id":86,"station":1,"weight":25,"tw":326,"tw_fmt":"13:26"},{"id":87,"station":1,"weight":15,"tw":210,"tw_fmt":"11:30"},{"id":88,"station":17,"weight":11,"tw":288,"tw_fmt":"12:48"},{"id":89,"station":6,"weight":18,"tw":210,"tw_fmt":"11:30"},{"id":90,"station":6,"weight":21,"tw":409,"tw_fmt":"14:49"},{"id":91,"station":8,"weight":28,"tw":293,"tw_fmt":"12:53"},{"id":92,"station":8,"weight":14,"tw":374,"tw_fmt":"14:14"},{"id":93,"station":7,"weight":16,"tw":330,"tw_fmt":"13:30"},{"id":94,"station":17,"weight":40,"tw":355,"tw_fmt":"13:55"},{"id":95,"station":2,"weight":15,"tw":231,"tw_fmt":"11:51"},{"id":96,"station":3,"weight":35,"tw":375,"tw_fmt":"14:15"},{"id":97,"station":1,"weight":28,"tw":387,"tw_fmt":"14:27"},{"id":98,"station":6,"weight":16,"tw":175,"tw_fmt":"10:55"},{"id":99,"station":22,"weight":19,"tw":289,"tw_fmt":"12:49"},{"id":100,"station":5,"weight":18,"tw":261,"tw_fmt":"12:21"}],"to":[{"id":1,"station":17,"weight":23,"tw":397,"tw_fmt":"14:37"},{"id":2,"station":5,"weight":11,"tw":251,"tw_fmt":"12:11"},{"id":3,"station":17,"weight":25,"tw":180,"tw_fmt":"11:00"},{"id":4,"station":17,"weight":26,"tw":255,"tw_fmt":"12:15"},{"id":5,"station":17,"weight":28,"tw":288,"tw_fmt":"12:48"},{"id":6,"station":11,"weight":20,"tw":278,"tw_fmt":"12:38"},{"id":7,"station":1,"weight":25,"tw":249,"tw_fmt":"12:09"},{"id":8,"station":15,"weight":34,"tw":380,"tw_fmt":"14:20"},{"id":9,"station":8,"weight":20,"tw":203,"tw_fmt":"11:23"},{"id":10,"station":1,"weight":19,"tw":270,"tw_fmt":"12:30"},{"id":11,"station":11,"weight":34,"tw":242,"tw_fmt":"12:02"},{"id":12,"station":11,"weight":2,"tw":272,"tw_fmt":"12:32"},{"id":13,"station":17,"weight":16,"tw":260,"tw_fmt":"12:20"},{"id":14,"station":22,"weight":39,"tw":329,"tw_fmt":"13:29"},{"id":15,"station":19,"weight":16,"tw":238,"tw_fmt":"11:58"},{"id":16,"station":22,"weight":16,"tw":251,"tw_fmt":"12:11"},{"id":17,"station":1,"weight":10,"tw":306,"tw_fmt":"13:06"},{"id":18,"station":5,"weight":26,"tw":365,"tw_fmt":"14:05"},{"id":19,"station":11,"weight":3,"tw":189,"tw_fmt":"11:09"},{"id":20,"station":23,"weight":14,"tw":408,"tw_fmt":"14:48"},{"id":21,"station":22,"weight":25,"tw":247,"tw_fmt":"12:07"},{"id":22,"station":11,"weight":20,"tw":339,"tw_fmt":"13:39"},{"id":23,"station":6,"weight":25,"tw":363,"tw_fmt":"14:03"},{"id":24,"station":1,"weight":21,"tw":379,"tw_fmt":"14:19"},{"id":25,"station":21,"weight":25,"tw":269,"tw_fmt":"12:29"},{"id":26,"station":15,"weight":10,"tw":301,"tw_fmt":"13:01"},{"id":27,"station":3,"weight":22,"tw":290,"tw_fmt":"12:50"},{"id":28,"station":10,"weight":7,"tw":264,"tw_fmt":"12:24"},{"id":29,"station":2,"weight":26,"tw":316,"tw_fmt":"13:16"},{"id":30,"station":21,"weight":18,"tw":322,"tw_fmt":"13:22"},{"id":31,"station":6,"weight":25,"tw":279,"tw_fmt":"12:39"},{"id":32,"station":23,"weight":16,"tw":308,"tw_fmt":"13:08"},{"id":33,"station":1,"weight":23,"tw":460,"tw_fmt":"15:40"},{"id":34,"station":22,"weight":28,"tw":300,"tw_fmt":"13:00"},{"id":35,"station":17,"weight":4,"tw":343,"tw_fmt":"13:43"},{"id":36,"station":17,"weight":5,"tw":272,"tw_fmt":"12:32"},{"id":37,"station":17,"weight":5,"tw":268,"tw_fmt":"12:28"},{"id":38,"station":20,"weight":27,"tw":279,"tw_fmt":"12:39"},{"id":39,"station":1,"weight":23,"tw":334,"tw_fmt":"13:34"},{"id":40,"station":22,"weight":14,"tw":252,"tw_fmt":"12:12"},{"id":41,"station":1,"weight":32,"tw":189,"tw_fmt":"11:09"},{"id":42,"station":6,"weight":21,"tw":303,"tw_fmt":"13:03"},{"id":43,"station":3,"weight":7,"tw":274,"tw_fmt":"12:34"},{"id":44,"station":22,"weight":12,"tw":317,"tw_fmt":"13:17"},{"id":45,"station":1,"weight":9,"tw":305,"tw_fmt":"13:05"},{"id":46,"station":17,"weight":28,"tw":344,"tw_fmt":"13:44"},{"id":47,"station":17,"weight":15,"tw":354,"tw_fmt":"13:54"},{"id":48,"station":17,"weight":11,"tw":220,"tw_fmt":"11:40"},{"id":49,"station":22,"weight":15,"tw":209,"tw_fmt":"11:29"},{"id":50,"station":1,"weight":13,"tw":330,"tw_fmt":"13:30"},{"id":51,"station":22,"weight":27,"tw":318,"tw_fmt":"13:18"},{"id":52,"station":16,"weight":24,"tw":244,"tw_fmt":"12:04"},{"id":53,"station":19,"weight":22,"tw":374,"tw_fmt":"14:14"},{"id":54,"station":4,"weight":23,"tw":302,"tw_fmt":"13:02"},{"id":55,"station":17,"weight":20,"tw":307,"tw_fmt":"13:07"},{"id":56,"station":19,"weight":12,"tw":316,"tw_fmt":"13:16"},{"id":57,"station":23,"weight":24,"tw":345,"tw_fmt":"13:45"},{"id":58,"station":11,"weight":13,"tw":391,"tw_fmt":"14:31"},{"id":59,"station":1,"weight":11,"tw":284,"tw_fmt":"12:44"},{"id":60,"station":1,"weight":11,"tw":196,"tw_fmt":"11:16"},{"id":61,"station":17,"weight":27,"tw":361,"tw_fmt":"14:01"},{"id":62,"station":22,"weight":28,"tw":244,"tw_fmt":"12:04"},{"id":63,"station":19,"weight":6,"tw":375,"tw_fmt":"14:15"},{"id":64,"station":6,"weight":19,"tw":265,"tw_fmt":"12:25"},{"id":65,"station":23,"weight":22,"tw":389,"tw_fmt":"14:29"},{"id":66,"station":16,"weight":15,"tw":252,"tw_fmt":"12:12"},{"id":67,"station":23,"weight":26,"tw":233,"tw_fmt":"11:53"},{"id":68,"station":1,"weight":22,"tw":357,"tw_fmt":"13:57"},{"id":69,"station":4,"weight":19,"tw":218,"tw_fmt":"11:38"},{"id":70,"station":22,"weight":16,"tw":341,"tw_fmt":"13:41"},{"id":71,"station":22,"weight":25,"tw":326,"tw_fmt":"13:26"},{"id":72,"station":22,"weight":27,"tw":291,"tw_fmt":"12:51"},{"id":73,"station":6,"weight":24,"tw":280,"tw_fmt":"12:40"},{"id":74,"station":1,"weight":18,"tw":423,"tw_fmt":"15:03"},{"id":75,"station":22,"weight":27,"tw":278,"tw_fmt":"12:38"},{"id":76,"station":22,"weight":13,"tw":289,"tw_fmt":"12:49"},{"id":77,"station":6,"weight":21,"tw":244,"tw_fmt":"12:04"},{"id":78,"station":5,"weight":31,"tw":251,"tw_fmt":"12:11"},{"id":79,"station":6,"weight":18,"tw":265,"tw_fmt":"12:25"},{"id":80,"station":22,"weight":13,"tw":403,"tw_fmt":"14:43"},{"id":81,"station":22,"weight":36,"tw":277,"tw_fmt":"12:37"},{"id":82,"station":17,"weight":18,"tw":259,"tw_fmt":"12:19"},{"id":83,"station":17,"weight":24,"tw":273,"tw_fmt":"12:33"},{"id":84,"station":6,"weight":14,"tw":343,"tw_fmt":"13:43"},{"id":85,"station":19,"weight":22,"tw":221,"tw_fmt":"11:41"},{"id":86,"station":22,"weight":24,"tw":338,"tw_fmt":"13:38"},{"id":87,"station":11,"weight":20,"tw":220,"tw_fmt":"11:40"},{"id":88,"station":11,"weight":23,"tw":292,"tw_fmt":"12:52"},{"id":89,"station":12,"weight":30,"tw":190,"tw_fmt":"11:10"},{"id":90,"station":6,"weight":9,"tw":332,"tw_fmt":"13:32"},{"id":91,"station":18,"weight":22,"tw":342,"tw_fmt":"13:42"},{"id":92,"station":22,"weight":4,"tw":259,"tw_fmt":"12:19"},{"id":93,"station":22,"weight":20,"tw":319,"tw_fmt":"13:19"},{"id":94,"station":21,"weight":35,"tw":310,"tw_fmt":"13:10"},{"id":95,"station":6,"weight":28,"tw":370,"tw_fmt":"14:10"},{"id":96,"station":18,"weight":20,"tw":308,"tw_fmt":"13:08"},{"id":97,"station":1,"weight":17,"tw":362,"tw_fmt":"14:02"},{"id":98,"station":1,"weight":24,"tw":293,"tw_fmt":"12:53"},{"id":99,"station":3,"weight":28,"tw":261,"tw_fmt":"12:21"},{"id":100,"station":1,"weight":20,"tw":298,"tw_fmt":"12:58"}]};
+
+const CAP={
+  50:{crowd:50.35,bus:17.61,log:75.32,fixed:60,ot:82.57,total:285.85,lo:76,bo:52,co:43,un:29},
+  100:{crowd:50.22,bus:32.78,log:74.54,fixed:60,ot:42.41,total:259.95,lo:76,bo:77,co:37,un:10},
+  150:{crowd:55.34,bus:53.63,log:25.45,fixed:30,ot:33.85,total:198.27,lo:32,bo:122,co:41,un:5},
+  200:{crowd:49.65,bus:55.44,log:25.36,fixed:30,ot:21.14,total:181.58,lo:32,bo:125,co:39,un:4},
+};
+const MODEL={
+  '传统物流':{crowd:0,bus:0,log:211.45,fixed:120,ot:103.2,total:434.65,un:43},
+  '客货邮':{crowd:0,bus:58.67,log:82.50,fixed:60,ot:19.2,total:220.38,un:32},
+  '城乡共同配送':{crowd:50.22,bus:32.78,log:74.54,fixed:60,ot:42.41,total:259.95,un:0},
+};
+const PEN={
+  '0.001':{crowd:32.91,bus:29.66,log:25.33,fixed:30,ot:51.40,total:169.30,lo:35,bo:95,co:20,v:1},
+  '0.005':{crowd:56.37,bus:37.06,log:89.56,fixed:60,ot:46.21,total:289.20,lo:35,bo:45,co:45,v:4},
+  '0.0075':{crowd:56.79,bus:18.61,log:143.42,fixed:90,ot:26.78,total:335.61,lo:79,bo:5,co:10,v:3},
+  '0.01':{crowd:69.66,bus:18.45,log:147.12,fixed:90,ot:17.62,total:342.85,lo:78,bo:13,co:9,v:4},
+};
+
+// ═══════ MAP ═══════
+const STNS={0:{x:14,y:10,type:'depot'},1:{x:19,y:6,type:'town'},2:{x:9,y:11,type:'village'},3:{x:3,y:12,type:'village'},4:{x:7,y:16,type:'village'},5:{x:16,y:9,type:'village'},6:{x:8,y:8,type:'town'},7:{x:19,y:15,type:'village'},8:{x:27,y:14,type:'village'},9:{x:15,y:25,type:'village'},10:{x:21,y:10,type:'village'},11:{x:9,y:26,type:'town'},12:{x:22,y:2,type:'village'},13:{x:18,y:3,type:'village'},14:{x:11,y:2,type:'village'},15:{x:3,y:4,type:'village'},16:{x:4,y:8,type:'village'},17:{x:22,y:22,type:'town'},18:{x:13,y:4,type:'village'},19:{x:26,y:12,type:'village'},20:{x:26,y:5,type:'village'},21:{x:8,y:23,type:'village'},22:{x:9,y:20,type:'town'},23:{x:3,y:26,type:'village'},24:{x:20,y:23,type:'village'},25:{x:23,y:25,type:'town'}};
+const BUS_ROUTES=[{id:'b1',nodes:[0,2,4,22,21,23],color:'#2966c4'},{id:'b2',nodes:[0,6,3,16,15,14],color:'#1a854a'},{id:'b3',nodes:[0,5,7,24,9,11],color:'#7c4dba'},{id:'b4',nodes:[0,18,1,20,13,12],color:'#d94230'},{id:'b5',nodes:[0,10,19,8,17,25],color:'#c27d1a'}];
+const LOG_ROUTES=[{nodes:[0,22,4,2,0],color:'#2966c4'},{nodes:[0,1,6,0],color:'#3b7dd8'},{nodes:[0,5,7,24,11,0],color:'#5090e0'},{nodes:[0,10,17,14,0],color:'#1b56a8'}];
+const ACTUAL_LOG_ROUTES=[{nodes:[0,5,1,0],color:'#2966c4',label:'车辆1'},{nodes:[0,22,0],color:'#3b7dd8',label:'车辆2'}];
+const CROWD_ROUTES=[
+{nodes:[0,9,11,23],color:'#9a9aac'},
+{nodes:[0,22,17,25],color:'#9a9aac'},
+{nodes:[0,4,21,23],color:'#9a9aac'},
+{nodes:[0,2,3],color:'#9a9aac'},
+{nodes:[0,6,16,15],color:'#9a9aac'},
+{nodes:[0,5,10,8,19],color:'#9a9aac'},
+{nodes:[0,18,14],color:'#9a9aac'},
+{nodes:[0,13,1,20,12],color:'#9a9aac'},
+{nodes:[0,7,24],color:'#9a9aac'}
+];
+const ROUTE_VIS={b1:true,b2:true,b3:true,b4:true,b5:true,log:true,crowd:true};
+const ROUTE_VIS2={log:true,bus:true,crowd:true};
+function toggleRoute2(id,btn){ROUTE_VIS2[id]=!ROUTE_VIS2[id];btn.classList.toggle('on',ROUTE_VIS2[id]);drawMap2();}
+function toggleRoute(id,btn){ROUTE_VIS[id]=!ROUTE_VIS[id];btn.classList.toggle('on',ROUTE_VIS[id]);drawMap();}
+
+// ═══════ NAV ═══════
+const PAGES=['overview','routes','routePath','routeOrders','busCap','model','penalty','orders','weight'];
+const PARAM_PAGES=['model','busCap','penalty','weight'];
+const ROUTES_PAGES=['routes','routePath','routeOrders'];
+const INITS={};
+function closeDDs(){document.querySelectorAll('.nav-dd').forEach(d=>d.classList.remove('open'));}
+function showPage(id){
+  PAGES.forEach(p=>document.getElementById('page-'+p)?.classList.remove('active'));
+  document.querySelectorAll('.nav>.nav-item').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-dd').forEach(el=>el.classList.remove('active'));
+  if(PARAM_PAGES.includes(id)){
+    document.getElementById('dd-param')?.classList.add('active');
+  } else if(ROUTES_PAGES.includes(id)){
+    document.getElementById('dd-routes')?.classList.add('active');
+  } else {
+    const navMap={overview:0,orders:1};
+    const directItems=document.querySelectorAll('.nav>.nav-item');
+    const idx=navMap[id];
+    if(idx!==undefined&&directItems[idx])directItems[idx].classList.add('active');
+  }
+  document.getElementById('page-'+id)?.classList.add('active');
+  if(!INITS[id]){INITS[id]=true;PINIT[id]?.();}
+}
+const PINIT={};
+
+// ═══════ CHART ═══════
+const CL={log:'#2966c4',bus:'#1a854a',crowd:'#c27d1a',fixed:'#7c4dba',ot:'#d94230',acc:'#d94230'};
+Chart.defaults.font.family="'Noto Sans SC',system-ui";
+const CD={plugins:{legend:{labels:{color:'#6b6b80',font:{size:10},boxWidth:10,padding:14}}},scales:{x:{ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}};
+function mkChart(id,type,data,opts={}){const el=document.getElementById(id);if(!el)return;if(el._c)el._c.destroy();el._c=new Chart(el,{type,data,options:{responsive:true,maintainAspectRatio:true,...CD,...opts}});}
+function stk(h=false){const ax={stacked:true,ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}};return{plugins:{legend:{labels:{color:'#6b6b80',font:{size:10},boxWidth:10,padding:14}}},scales:{x:{...ax},y:{...ax}},indexAxis:h?'y':'x'};}
+
+// ═══════ MAP DRAW ═══════
+let animFrame=null;const vehicleState=[];
+function initMap(){const canvas=document.getElementById('map-canvas'),wrap=document.getElementById('map-wrap');function resize(){const dpr=window.devicePixelRatio||1;const W=wrap.clientWidth,H=Math.min(W*0.55,500);canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);drawMap();}resize();new ResizeObserver(resize).observe(wrap);vehicleState.length=0;BUS_ROUTES.forEach((r,i)=>vehicleState.push({route:r,t:(i*.2)%1,speed:.0006}));LOG_ROUTES.forEach((r,i)=>vehicleState.push({route:{...r,id:'log'},t:(i*.25)%1,speed:.0008}));startAnim();}
+function startAnim(){if(animFrame)cancelAnimationFrame(animFrame);function loop(){vehicleState.forEach(v=>{v.t=(v.t+v.speed)%1;});drawMap();animFrame=requestAnimationFrame(loop);}loop();}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(animFrame)cancelAnimationFrame(animFrame);animFrame=null;}else startAnim();});
+
+function drawMap(){
+  const canvas=document.getElementById('map-canvas');if(!canvas)return;
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.width/dpr,H=canvas.height/dpr,ctx=canvas.getContext('2d');
+  ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  // warm off-white bg
+  ctx.fillStyle='#fafaf8';ctx.fillRect(0,0,W,H);
+  const PAD={l:42,r:22,t:34,b:34};
+  const scaleX=(W-PAD.l-PAD.r)/30,scaleY=(H-PAD.t-PAD.b)/30;
+  function cx(x){return PAD.l+x*scaleX;}function cy(y){return H-PAD.b-y*scaleY;}
+
+  // Grid
+  ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=.5;
+  for(let i=0;i<=6;i++){const gx=cx(i*5),gy=cy(i*5);ctx.beginPath();ctx.moveTo(gx,PAD.t);ctx.lineTo(gx,H-PAD.b);ctx.stroke();ctx.beginPath();ctx.moveTo(PAD.l,gy);ctx.lineTo(W-PAD.r,gy);ctx.stroke();}
+  ctx.fillStyle='#9a9aac';ctx.font='9px IBM Plex Mono,monospace';ctx.textAlign='center';
+  for(let i=0;i<=6;i++){ctx.fillText(i*5,cx(i*5),H-PAD.b+16);if(i>0){ctx.textAlign='right';ctx.fillText(i*5,PAD.l-6,cy(i*5)+3);ctx.textAlign='center';}}
+  ctx.fillText('X/km',W/2,H-4);
+  ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('Y/km',0,0);ctx.restore();
+
+  function drawRoute(nodes,color,dashed,width,alpha){ctx.beginPath();nodes.forEach((n,i)=>{const s=STNS[n];if(!s)return;i===0?ctx.moveTo(cx(s.x),cy(s.y)):ctx.lineTo(cx(s.x),cy(s.y));});ctx.strokeStyle=color;ctx.lineWidth=width||2.5;ctx.globalAlpha=alpha||1;ctx.setLineDash(dashed?[6,4]:[]);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;}
+
+  BUS_ROUTES.forEach(r=>{if(!ROUTE_VIS[r.id])return;drawRoute(r.nodes,r.color,false,2.5,.85);const mid=Math.floor(r.nodes.length/2);const a=STNS[r.nodes[mid-1]],b=STNS[r.nodes[mid]];if(a&&b){const mx=cx((a.x+b.x)/2),my=cy((a.y+b.y)/2),ang=Math.atan2(cy(b.y)-cy(a.y),cx(b.x)-cx(a.x));ctx.save();ctx.translate(mx,my);ctx.rotate(ang);ctx.fillStyle=r.color;ctx.globalAlpha=.9;ctx.beginPath();ctx.moveTo(6,0);ctx.lineTo(-4,-4);ctx.lineTo(-4,4);ctx.closePath();ctx.fill();ctx.restore();ctx.globalAlpha=1;}});
+  if(ROUTE_VIS.log)LOG_ROUTES.forEach(r=>drawRoute(r.nodes,r.color,true,2,.6));
+  if(ROUTE_VIS.crowd)CROWD_ROUTES.forEach(r=>drawRoute(r.nodes,r.color,true,1.5,.35));
+
+  Object.entries(STNS).forEach(([id,s])=>{
+    const x=cx(s.x),y=cy(s.y);ctx.save();
+    if(s.type==='depot'){
+      const t2=Date.now()*.001;
+      [2,1].forEach(i=>{const a=Math.max(0,(Math.sin(t2-i*.9)+1)/2*.25);ctx.beginPath();ctx.arc(x,y,15+i*8,0,Math.PI*2);ctx.strokeStyle=`rgba(217,66,48,${a})`;ctx.lineWidth=1.2;ctx.stroke();});
+      ctx.beginPath();ctx.moveTo(x,y-12);ctx.lineTo(x+10,y+7);ctx.lineTo(x-10,y+7);ctx.closePath();ctx.fillStyle='#d94230';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+    }else if(s.type==='town'){
+      ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#2966c4';ctx.lineWidth=2.5;ctx.stroke();
+    }else{
+      ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#9a9aac';ctx.lineWidth=1.5;ctx.stroke();
+    }
+    ctx.fillStyle=s.type==='depot'?'#d94230':s.type==='town'?'#2966c4':'#6b6b80';
+    ctx.font=s.type==='depot'?"bold 11px 'Noto Sans SC'":"10px 'Noto Sans SC'";
+    const lx=s.x>25?x-10:s.x<2?x+10:x+(s.type==='depot'?0:11);
+    const ly=s.y>27?y+14:y-12;
+    ctx.textAlign=s.x<2?'left':s.x>25?'right':'center';ctx.textBaseline='middle';ctx.fillText(id,lx,ly);
+    ctx.restore();
+  });
+
+  vehicleState.forEach(v=>{const routeId=v.route.id;const vis=routeId.startsWith('b')?ROUTE_VIS[routeId]:routeId==='log'?ROUTE_VIS.log:ROUTE_VIS.crowd;if(!vis)return;const nodes=v.route.nodes,total=nodes.length-1,seg=Math.min(Math.floor(v.t*total),total-1),f=v.t*total-seg;const a=STNS[nodes[seg]],b=STNS[nodes[seg+1]];if(!a||!b)return;const px=cx(a.x+(b.x-a.x)*f),py=cy(a.y+(b.y-a.y)*f);ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);ctx.fillStyle=v.route.color;ctx.shadowColor=v.route.color;ctx.shadowBlur=8;ctx.fill();ctx.shadowBlur=0;});
+  ctx.restore();
+}
+
+function initMap2(){
+  const canvas=document.getElementById('map-canvas2'),wrap=document.getElementById('map-wrap2');
+  if(!canvas||!wrap)return;
+  // Build animated vehicles for actual routes
+  map2Vehicles.length=0;
+  ACTUAL_LOG_ROUTES.forEach((r,i)=>map2Vehicles.push({nodes:r.nodes,color:r.color,t:(i*.3)%1,speed:.0005,size:5}));
+  CROWD_ROUTES.forEach((r,i)=>map2Vehicles.push({nodes:r.nodes,color:'#c27d1a',t:(i*.12)%1,speed:.0007,size:3.5}));
+  BUS_ROUTES.forEach((r,i)=>map2Vehicles.push({nodes:r.nodes,color:r.color,t:(i*.18)%1,speed:.0004,size:4}));
+  function resize(){const dpr=window.devicePixelRatio||1;const W=wrap.clientWidth,H=Math.min(W*0.55,500);canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);drawMap2();}
+  resize();new ResizeObserver(resize).observe(wrap);
+  startAnim2();
+}
+const map2Vehicles=[];
+let animFrame2=null;
+function startAnim2(){if(animFrame2)cancelAnimationFrame(animFrame2);function loop(){map2Vehicles.forEach(v=>{v.t=(v.t+v.speed)%1;});drawMap2();animFrame2=requestAnimationFrame(loop);}loop();}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(animFrame2){cancelAnimationFrame(animFrame2);animFrame2=null;}}else if(map2Vehicles.length>0)startAnim2();});
+function drawMap2(){
+  const canvas=document.getElementById('map-canvas2');if(!canvas)return;
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.width/dpr,H=canvas.height/dpr,ctx=canvas.getContext('2d');
+  ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fafaf8';ctx.fillRect(0,0,W,H);
+  const PAD={l:42,r:22,t:34,b:34};
+  const scaleX=(W-PAD.l-PAD.r)/30,scaleY=(H-PAD.t-PAD.b)/30;
+  function cx(x){return PAD.l+x*scaleX;}function cy(y){return H-PAD.b-y*scaleY;}
+  // Grid
+  ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=.5;
+  for(let i=0;i<=6;i++){const gx=cx(i*5),gy=cy(i*5);ctx.beginPath();ctx.moveTo(gx,PAD.t);ctx.lineTo(gx,H-PAD.b);ctx.stroke();ctx.beginPath();ctx.moveTo(PAD.l,gy);ctx.lineTo(W-PAD.r,gy);ctx.stroke();}
+  ctx.fillStyle='#9a9aac';ctx.font='9px IBM Plex Mono,monospace';ctx.textAlign='center';
+  for(let i=0;i<=6;i++){ctx.fillText(i*5,cx(i*5),H-PAD.b+16);if(i>0){ctx.textAlign='right';ctx.fillText(i*5,PAD.l-6,cy(i*5)+3);ctx.textAlign='center';}}
+  ctx.fillText('X/km',W/2,H-4);
+  ctx.save();ctx.translate(12,H/2);ctx.rotate(-Math.PI/2);ctx.fillText('Y/km',0,0);ctx.restore();
+  // Draw actual logistics routes (only 2 vehicles were used)
+  if(ROUTE_VIS2.log){
+    ACTUAL_LOG_ROUTES.forEach(r=>{
+      ctx.beginPath();
+      r.nodes.forEach((n,i)=>{const s=STNS[n];if(!s)return;i===0?ctx.moveTo(cx(s.x),cy(s.y)):ctx.lineTo(cx(s.x),cy(s.y));});
+      ctx.strokeStyle=r.color;ctx.lineWidth=2.5;ctx.globalAlpha=.75;ctx.setLineDash([]);ctx.stroke();ctx.globalAlpha=1;
+    });
+  }
+  // Bus routes
+  if(ROUTE_VIS2.bus){
+    BUS_ROUTES.forEach(r=>{ctx.beginPath();r.nodes.forEach((n,i)=>{const s=STNS[n];if(!s)return;i===0?ctx.moveTo(cx(s.x),cy(s.y)):ctx.lineTo(cx(s.x),cy(s.y));});ctx.strokeStyle='#1a854a';ctx.lineWidth=2.5;ctx.globalAlpha=.75;ctx.setLineDash([]);ctx.stroke();ctx.globalAlpha=1;});
+  }
+  // Crowd routes - draw actual multi-hop paths
+  if(ROUTE_VIS2.crowd){
+    CROWD_ROUTES.forEach(r=>{
+      ctx.beginPath();
+      r.nodes.forEach((n,i)=>{const s=STNS[n];if(!s)return;i===0?ctx.moveTo(cx(s.x),cy(s.y)):ctx.lineTo(cx(s.x),cy(s.y));});
+      ctx.strokeStyle='#c27d1a';ctx.lineWidth=1.5;ctx.globalAlpha=.5;ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    });
+    // Placeholder to close old block structure
+    [].forEach(s=>{const a=STNS[0],b=STNS[s];if(!a||!b)return;
+      ctx.beginPath();ctx.moveTo(cx(a.x),cy(a.y));ctx.lineTo(cx(b.x),cy(b.y));ctx.strokeStyle='#c27d1a';ctx.lineWidth=1.5;ctx.globalAlpha=.4;ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    });
+  }
+  // Draw stations
+  Object.entries(STNS).forEach(([id,s])=>{
+    const x=cx(s.x),y=cy(s.y);ctx.save();
+    if(s.type==='depot'){
+      ctx.beginPath();ctx.moveTo(x,y-12);ctx.lineTo(x+10,y+7);ctx.lineTo(x-10,y+7);ctx.closePath();ctx.fillStyle='#d94230';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+    }else if(s.type==='town'){
+      ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#2966c4';ctx.lineWidth=2.5;ctx.stroke();
+    }else{
+      ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#9a9aac';ctx.lineWidth=1.5;ctx.stroke();
+    }
+    ctx.fillStyle=s.type==='depot'?'#d94230':s.type==='town'?'#2966c4':'#6b6b80';
+    ctx.font=s.type==='depot'?"bold 11px 'Noto Sans SC'":"10px 'Noto Sans SC'";
+    const lx=s.x>25?x-10:s.x<2?x+10:x+(s.type==='depot'?0:11);
+    const ly=s.y>27?y+14:y-12;
+    ctx.textAlign=s.x<2?'left':s.x>25?'right':'center';ctx.textBaseline='middle';ctx.fillText(id,lx,ly);
+    ctx.restore();
+  });
+  // Draw animated vehicle dots
+  map2Vehicles.forEach(v=>{
+    const nodes=v.nodes,total=nodes.length-1;if(total<=0)return;
+    const seg=Math.min(Math.floor(v.t*total),total-1),f=v.t*total-seg;
+    const a=STNS[nodes[seg]],b=STNS[nodes[Math.min(seg+1,nodes.length-1)]];
+    if(!a||!b)return;
+    const px=cx(a.x+(b.x-a.x)*f),py=cy(a.y+(b.y-a.y)*f);
+    ctx.beginPath();ctx.arc(px,py,v.size,0,Math.PI*2);
+    ctx.fillStyle=v.color;ctx.shadowColor=v.color;ctx.shadowBlur=10;ctx.fill();ctx.shadowBlur=0;
+    // Draw trail
+    ctx.beginPath();ctx.arc(px,py,v.size+2,0,Math.PI*2);
+    ctx.strokeStyle=v.color;ctx.globalAlpha=.3;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
+  });
+  ctx.restore();
+}
+PINIT.overview=function(){initMap();
+  // Logistics vehicle departure timeline
+  // Timeline for logistics vehicles - matching bus timeline style
+  (function(){
+    const logCanvas=document.getElementById('net-log-timeline');
+    if(!logCanvas)return;
+    // Style matching bus chart: horizontal stacked bars with color-coded departure groups
+    mkChart('net-log-timeline','bar',{
+      labels:['车辆1','车辆2','车辆3','车辆4'],
+      datasets:[
+        {label:'08:00 发车',data:[200,200,0,0],backgroundColor:'rgba(41,102,196,.55)',borderColor:'#2966c4',borderWidth:1,borderSkipped:false},
+        {label:'待命',data:[0,0,300,300],backgroundColor:'rgba(0,0,0,.03)',borderColor:'rgba(0,0,0,.06)',borderWidth:1,borderSkipped:false},
+        {label:'13:00 发车',data:[0,0,200,200],backgroundColor:'rgba(41,102,196,.55)',borderColor:'#2966c4',borderWidth:1,borderSkipped:false},
+      ]
+    },{indexAxis:'y',plugins:{legend:{labels:{color:'#6b6b80',font:{size:10},boxWidth:10,padding:14,filter:function(item){return item.text!=='待命';}}}},scales:{x:{stacked:true,title:{display:true,text:'运营时间 · 08:00–18:00（600min）· 车辆1&2首发 · 车辆3&4午后',color:'#9a9aac',font:{size:8}},ticks:{color:'#9a9aac',font:{size:9},stepSize:100,callback:function(v){const h=Math.floor((480+v)/60),m=(480+v)%60;return h+':'+String(m).padStart(2,'0');}},min:0,max:600,grid:{color:'rgba(0,0,0,.04)'}},y:{stacked:true,ticks:{color:'#9a9aac',font:{size:10}},grid:{display:false}}}});
+  })();
+  // Bus route departure timeline
+  mkChart('net-bus-timeline','bar',{
+    labels:['1线','2线','3线','4线','5线'],
+    datasets:[
+      {label:'第1班 · 08:00',data:[200,200,200,200,200],backgroundColor:'rgba(41,102,196,.55)',borderColor:'#2966c4',borderWidth:1,borderSkipped:false},
+      {label:'第2班 · 11:20',data:[200,200,200,200,200],backgroundColor:'rgba(26,133,74,.55)',borderColor:'#1a854a',borderWidth:1,borderSkipped:false},
+      {label:'第3班 · 14:40',data:[200,200,200,200,200],backgroundColor:'rgba(194,125,26,.55)',borderColor:'#c27d1a',borderWidth:1,borderSkipped:false}
+    ]
+  },{indexAxis:'y',plugins:{legend:{labels:{color:'#6b6b80',font:{size:10},boxWidth:10,padding:14}}},scales:{x:{stacked:true,title:{display:true,text:'运营时间 · 08:00–18:00（600min）· 等间隔200min发车',color:'#9a9aac',font:{size:8}},ticks:{color:'#9a9aac',font:{size:9},stepSize:100,callback:function(v){const h=Math.floor((480+v)/60),m=(480+v)%60;return h+':'+String(m).padStart(2,'0');}},min:0,max:600,grid:{color:'rgba(0,0,0,.04)'}},y:{stacked:true,ticks:{color:'#9a9aac',font:{size:10}},grid:{display:false}}}});
+};
+
+// ═══════ ROUTES & COST ═══════
+PINIT.routes=function(){
+  // Order weight distribution
+  const wtsR=ORDERS.map(o=>o.weight),wBR=[0,5,10,15,20,25,30,35,40,50];
+  mkChart('ord-w','bar',{labels:wBR.slice(0,-1).map((b,i)=>`${b}-${wBR[i+1]}`),datasets:[{label:'订单数',data:wBR.slice(0,-1).map((b,i)=>wtsR.filter(w=>w>=b&&w<wBR[i+1]).length),backgroundColor:CL.log+'cc',borderColor:CL.log,borderWidth:1}]});
+  // Overtime distribution
+  const otOsR=ORDERS.filter(o=>o.overtime>0&&o.mode!=='unserved'),oBR=[0,50,100,200,300,400,600];
+  mkChart('ord-ot','bar',{labels:oBR.slice(0,-1).map((b,i)=>`${b}-${oBR[i+1]}`),datasets:[{label:'超时订单数',data:oBR.slice(0,-1).map((b,i)=>otOsR.filter(o=>o.overtime>=b&&o.overtime<oBR[i+1]).length),backgroundColor:CL.ot+'cc',borderColor:CL.ot,borderWidth:1}]});
+  mkChart('ov-cost','bar',{labels:['传统物流','客货邮','城乡共同配送'],datasets:[{label:'物流运输',data:[211.45,82.50,74.54],backgroundColor:CL.log+'cc'},{label:'公交捎带',data:[0,58.67,32.78],backgroundColor:CL.bus+'cc'},{label:'众包配送',data:[0,0,50.22],backgroundColor:CL.crowd+'cc'},{label:'固定成本',data:[120,60,60],backgroundColor:CL.fixed+'cc'},{label:'超时成本',data:[103.2,19.2,42.41],backgroundColor:CL.ot+'cc'}]},stk());
+  mkChart('ov-trend','line',{labels:['50','100','150','200'],datasets:[{label:'总成本（元）',data:[285.85,259.95,198.27,181.58],borderColor:CL.acc,backgroundColor:CL.acc+'15',pointBackgroundColor:CL.acc,tension:.35,fill:true}]});
+  mkChart('rt-mode','doughnut',{labels:['物流专车 74','公交捎带 77','众包车辆 39'],datasets:[{data:[74,77,39],backgroundColor:[CL.log+'dd',CL.bus+'dd',CL.crowd+'dd'],borderColor:'#fff',borderWidth:2}]},{plugins:{legend:{labels:{color:'#6b6b80',font:{size:11}},position:'bottom'}},scales:{}});
+};
+PINIT.routePath=function(){
+  setTimeout(()=>initMap2(),100);
+};
+PINIT.routeOrders=function(){
+  renderOrdTbl();
+};
+
+// ═══════ BUS CAPACITY ═══════
+let curCap=100;
+function selCap(v,btn){curCap=v;document.querySelectorAll('#page-busCap .sb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderCap();}
+function renderCap(){const d=CAP[curCap];
+  document.getElementById('cap-kpi').innerHTML=`<div class="mc"><div class="mc-l">总成本</div><div class="mc-v" style="color:var(--red)">${d.total.toFixed(1)}</div><div class="mc-s">元</div></div><div class="mc"><div class="mc-l">物流订单</div><div class="mc-v" style="color:var(--blue)">${d.lo}</div><div class="mc-s">${(d.lo/200*100).toFixed(0)}%</div></div><div class="mc"><div class="mc-l">公交订单</div><div class="mc-v" style="color:var(--green)">${d.bo}</div><div class="mc-s">${(d.bo/200*100).toFixed(0)}%</div></div><div class="mc"><div class="mc-l">众包订单</div><div class="mc-v" style="color:var(--amber)">${d.co}</div><div class="mc-s">${(d.co/200*100).toFixed(0)}%</div></div><div class="mc"><div class="mc-l">未完成配送订单</div><div class="mc-v" style="color:var(--red)">${d.un}</div><div class="mc-s">${(d.un/200*100).toFixed(0)}%</div></div><div class="mc"><div class="mc-l">超时成本</div><div class="mc-v" style="color:var(--red)">${d.ot.toFixed(1)}</div><div class="mc-s">元</div></div>`;
+  mkChart('cap-cost','doughnut',{labels:['众包','公交','物流','固定','超时'],datasets:[{data:[d.crowd,d.bus,d.log,d.fixed,d.ot],backgroundColor:[CL.crowd+'dd',CL.bus+'dd',CL.log+'dd',CL.fixed+'dd',CL.ot+'dd'],borderColor:'#fff',borderWidth:2}]},{plugins:{legend:{labels:{color:'#6b6b80',font:{size:10}},position:'bottom'}},scales:{}});
+  mkChart('cap-ord','bar',{labels:['物流专车','城乡公交','众包车辆'],datasets:[{label:'订单数',data:[d.lo,d.bo,d.co],backgroundColor:[CL.log+'cc',CL.bus+'cc',CL.crowd+'cc']}]});
+  const caps=[50,100,150,200];
+  mkChart('cap-all','bar',{labels:caps.map(c=>`${c}`),datasets:[{label:'众包',data:caps.map(c=>CAP[c].crowd),backgroundColor:CL.crowd+'cc'},{label:'公交',data:caps.map(c=>CAP[c].bus),backgroundColor:CL.bus+'cc'},{label:'物流',data:caps.map(c=>CAP[c].log),backgroundColor:CL.log+'cc'},{label:'固定',data:caps.map(c=>CAP[c].fixed),backgroundColor:CL.fixed+'cc'},{label:'超时',data:caps.map(c=>CAP[c].ot),backgroundColor:CL.ot+'cc'}]},stk());
+  document.getElementById('cap-tbody').innerHTML=caps.map(c=>{const d2=CAP[c];const hi=c===curCap?'background:rgba(217,66,48,.03)':'';return`<tr style="${hi}"><td><span class="badge bd-log">${c}</span></td><td style="color:var(--amber)">${d2.crowd.toFixed(2)}</td><td style="color:var(--green)">${d2.bus.toFixed(2)}</td><td style="color:var(--blue)">${d2.log.toFixed(2)}</td><td style="color:var(--purple)">${d2.fixed.toFixed(2)}</td><td style="color:var(--red)">${d2.ot.toFixed(2)}</td><td style="font-weight:700;color:var(--red)">${d2.total.toFixed(2)}</td><td>${d2.lo}</td><td>${d2.bo}</td><td>${d2.co}</td><td style="color:var(--red)">${d2.un}</td></tr>`;}).join('');
+}
+PINIT.busCap=renderCap;
+
+// ═══════ MODEL ═══════
+PINIT.model=function(){const labs=Object.keys(MODEL),vals=Object.values(MODEL);
+  mkChart('mod-total','bar',{labels:labs,datasets:[{label:'总成本（元）',data:vals.map(d=>d.total),backgroundColor:['#d9423055','#2966c455','#1a854a55'],borderColor:['#d94230','#2966c4','#1a854a'],borderWidth:2}]});
+  mkChart('mod-unserved','bar',{labels:labs,datasets:[{label:'未服务需求数量',data:vals.map(d=>d.un),backgroundColor:['#d9423055','#2966c455','#1a854a55'],borderColor:['#d94230','#2966c4','#1a854a'],borderWidth:2}]},{plugins:{legend:{labels:{color:'#6b6b80',font:{size:10}}}},scales:{x:{ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,.04)'}},y:{ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,.04)'},min:0,suggestedMax:55}}});
+  mkChart('mod-stack','bar',{labels:labs,datasets:[{label:'物流',data:vals.map(d=>d.log),backgroundColor:CL.log+'cc'},{label:'公交',data:vals.map(d=>d.bus),backgroundColor:CL.bus+'cc'},{label:'众包',data:vals.map(d=>d.crowd),backgroundColor:CL.crowd+'cc'},{label:'固定',data:vals.map(d=>d.fixed),backgroundColor:CL.fixed+'cc'},{label:'超时',data:vals.map(d=>d.ot),backgroundColor:CL.ot+'cc'}]},stk(true));
+};
+
+// ═══════ PENALTY ═══════
+PINIT.penalty=function(){const labs=Object.keys(PEN).map(p=>`λ=${p}`),vals=Object.values(PEN);
+  mkChart('pen-total','line',{labels:labs,datasets:[{label:'总成本',data:vals.map(d=>d.total),borderColor:CL.acc,backgroundColor:CL.acc+'15',pointBackgroundColor:CL.acc,tension:.3,fill:true}]});
+  mkChart('pen-breakdown','line',{labels:labs,datasets:[{label:'超时成本',data:vals.map(d=>d.ot),borderColor:CL.ot,backgroundColor:CL.ot+'12',tension:.3},{label:'固定成本',data:vals.map(d=>d.fixed),borderColor:CL.fixed,backgroundColor:CL.fixed+'12',tension:.3}]});
+  mkChart('pen-stack','bar',{labels:labs,datasets:[{label:'众包',data:vals.map(d=>d.crowd),backgroundColor:CL.crowd+'cc'},{label:'公交',data:vals.map(d=>d.bus),backgroundColor:CL.bus+'cc'},{label:'物流',data:vals.map(d=>d.log),backgroundColor:CL.log+'cc'},{label:'固定',data:vals.map(d=>d.fixed),backgroundColor:CL.fixed+'cc'},{label:'超时',data:vals.map(d=>d.ot),backgroundColor:CL.ot+'cc'}]},stk(true));
+  mkChart('pen-modes','bar',{labels:labs,datasets:[{label:'物流',data:vals.map(d=>d.lo),backgroundColor:CL.log+'cc'},{label:'公交',data:vals.map(d=>d.bo),backgroundColor:CL.bus+'cc'},{label:'众包',data:vals.map(d=>d.co),backgroundColor:CL.crowd+'cc'}]},stk());
+  mkChart('pen-vehs','bar',{labels:labs,datasets:[{label:'物流车数量',data:vals.map(d=>d.v),backgroundColor:CL.log+'cc'}]});
+  document.getElementById('pen-tbody').innerHTML=Object.entries(PEN).map(([k,d])=>`<tr><td style="font-family:'IBM Plex Mono',monospace;color:var(--red)">${k}</td><td style="color:var(--amber)">${d.crowd.toFixed(2)}</td><td style="color:var(--green)">${d.bus.toFixed(2)}</td><td style="color:var(--blue)">${d.log.toFixed(2)}</td><td style="color:var(--purple)">${d.fixed.toFixed(2)}</td><td style="color:var(--red)">${d.ot.toFixed(2)}</td><td style="font-weight:700;color:var(--red)">${d.total.toFixed(2)}</td><td>${d.lo}</td><td>${d.bo}</td><td>${d.co}</td></tr>`).join('');
+};
+
+// ═══════ DEMAND ═══════
+let curDir='from';
+function selDemand(d,btn){curDir=d;document.querySelectorAll('#page-orders .sr .sb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderDemand();}
+
+function renderDemand(){const isF=curDir==='from',ords=DEMAND_DATA[curDir];const sc={},sw={};for(const o of ords){sc[o.station]=(sc[o.station]||0)+1;sw[o.station]=(sw[o.station]||0)+o.weight;}const stns=Object.keys(sc).map(Number).sort((a,b)=>a-b);const sL=stns.map(s=>`站${s}`),col=isF?CL.log:CL.bus,col2=isF?CL.crowd:CL.fixed;
+  document.getElementById('d-bt').textContent=`各站点订单数量 — ${isF?'下行':'上行'}`;document.getElementById('d-wt').textContent=`各站点需求重量(kg) — ${isF?'下行':'上行'}`;
+  const hOpts={indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#6b6b80',font:{size:10},boxWidth:10,padding:14}}},scales:{x:{ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}},y:{ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}};
+  mkChart('d-bar','bar',{labels:sL,datasets:[{label:'订单数',data:stns.map(s=>sc[s]),backgroundColor:col+'cc',borderColor:col,borderWidth:1}]},hOpts);
+  mkChart('d-weight','bar',{labels:sL,datasets:[{label:'重量(kg)',data:stns.map(s=>sw[s]),backgroundColor:col2+'cc',borderColor:col2,borderWidth:1}]},hOpts);
+  const wts=ords.map(o=>o.weight),wB=[0,5,10,15,20,25,30,35,40,50];
+  mkChart('d-hist','bar',{labels:wB.slice(0,-1).map((b,i)=>`${b}-${wB[i+1]}`),datasets:[{label:'订单数',data:wB.slice(0,-1).map((b,i)=>wts.filter(w=>w>=b&&w<wB[i+1]).length),backgroundColor:CL.acc+'88',borderColor:CL.acc,borderWidth:1}]});
+  const tws=ords.map(o=>o.tw),tB=[150,200,250,300,350,400,450,500];const toT=t=>{const s=480+t,h=Math.floor(s/60),m=s%60;return`${h}:${String(m).padStart(2,'0')}`;};
+  mkChart('d-tw','bar',{labels:tB.slice(0,-1).map(b=>toT(b)),datasets:[{label:'订单数',data:tB.slice(0,-1).map((b,i)=>tws.filter(t=>t>=b&&t<tB[i+1]).length),backgroundColor:CL.ot+'88',borderColor:CL.ot,borderWidth:1}]});
+  const stnTipData={};
+  document.getElementById('d-tbody').innerHTML=stns.map(s=>{const cnt=sc[s],wt=sw[s],sOs=ords.filter(o=>o.station===s);const mnTw=Math.min(...sOs.map(o=>o.tw)),mxTw=Math.max(...sOs.map(o=>o.tw));
+    const tipRows=sOs.map(o=>`<tr><td style="font-family:'IBM Plex Mono',monospace;color:var(--ink4)">#${String(o.id).padStart(3,'0')}</td><td>${o.weight}kg</td><td style="font-family:'IBM Plex Mono',monospace">${o.tw_fmt}</td></tr>`).join('');
+    stnTipData[s]=`<h4>站${s} — ${isF?'下行':'上行'}订单（${cnt}条）</h4><table><thead><tr><th>编号</th><th>重量</th><th>时间窗</th></tr></thead><tbody>${tipRows}</tbody></table>`;
+    return`<tr><td><span class="badge bd-log stn-tip-wrap" data-stn="${s}" style="cursor:pointer">站 ${s}</span></td><td>${cnt}</td><td style="color:var(--amber)">${wt}kg</td><td>${(wt/cnt).toFixed(1)}kg</td><td style="font-family:'IBM Plex Mono',monospace">${toT(mnTw)}</td><td style="font-family:'IBM Plex Mono',monospace">${toT(mxTw)}</td></tr>`;}).join('');
+  // Bind tooltip hover
+  const tip=document.getElementById('stn-float-tip');
+  document.querySelectorAll('#d-tbody .stn-tip-wrap').forEach(el=>{
+    el.addEventListener('mouseenter',function(e){
+      const s=this.dataset.stn;if(!stnTipData[s])return;
+      tip.innerHTML=stnTipData[s];tip.style.display='block';
+      const r=this.getBoundingClientRect();
+      let left=r.right+10,top=r.top-10;
+      if(left+320>window.innerWidth)left=r.left-320;
+      if(top+320>window.innerHeight)top=Math.max(10,window.innerHeight-330);
+      tip.style.left=left+'px';tip.style.top=top+'px';
+    });
+    el.addEventListener('mouseleave',function(){tip.style.display='none';});
+  });
+}
+
+// ═══════ ORDERS ═══════
+let ordPage=1,ordFil=[];const PS=25;
+PINIT.orders=function(){
+  // Demand section
+  const f=DEMAND_DATA.from,t=DEMAND_DATA.to;const ft=f.reduce((s,o)=>s+o.weight,0),tt=t.reduce((s,o)=>s+o.weight,0);
+  document.getElementById('d-ft').textContent=ft;document.getElementById('d-tt').textContent=tt;
+  document.getElementById('d-av').textContent=(ft/f.length).toFixed(1);
+  document.getElementById('d-st').textContent=new Set([...f.map(o=>o.station),...t.map(o=>o.station)]).size;
+  renderDemand();
+  // Orders section - demand only now
+};
+function filterOrd(){ordPage=1;renderOrdTbl();}
+function renderOrdTbl(){const s=(document.getElementById('ord-s').value||'').toLowerCase(),mf=document.getElementById('ord-m').value,of2=document.getElementById('ord-of').value;
+  ordFil=ORDERS.filter(o=>{if(mf&&o.mode!==mf)return false;if(of2==='overtime'&&(o.overtime<=0||o.mode==='unserved'))return false;if(of2==='ontime'&&(o.overtime>0||o.mode==='unserved'))return false;if(s){
+      const sn=s.replace(/^#/,'').trim();
+      const isNum=/^\d+$/.test(sn);
+      if(isNum){
+        const num=parseInt(sn);
+        if(!(o.id===num||o.from===num||o.to===num||o.veh===String(num)))return false;
+      }else{
+        const modeMap={'物流':'logistics','公交':'bus','众包':'crowd','未服务':'unserved','未':'unserved','超时':'__overtime__'};
+        let matched=false;
+        for(const[k,v] of Object.entries(modeMap)){
+          if(sn.includes(k)){if(v==='__overtime__'){matched=o.overtime>0&&o.mode!=='unserved';}else{matched=o.mode===v;}break;}
+        }
+        if(!matched&&!Object.keys(modeMap).some(k=>sn.includes(k))){
+          if(!o.mode.includes(sn))return false;
+        }else if(!matched)return false;
+      }
+    }return true;});
+  const tot=ordFil.length,pgs=Math.max(1,Math.ceil(tot/PS));if(ordPage>pgs)ordPage=pgs;const st=(ordPage-1)*PS,sl=ordFil.slice(st,st+PS);
+  document.getElementById('ord-cnt').textContent=`共 ${tot} 条`;document.getElementById('ord-pi').textContent=`第 ${ordPage}/${pgs} 页 · ${st+1}–${Math.min(st+PS,tot)}`;
+  const mL={logistics:'物流专车',bus:'公交捎带',crowd:'众包车辆',unserved:'未服务'},mB={logistics:'bd-log',bus:'bd-bus',crowd:'bd-crowd',unserved:'bd-un'};const isOT=o=>o.overtime>0&&o.mode!=='unserved';
+  document.getElementById('ord-tb').innerHTML=sl.map(o=>`<tr><td style="font-family:'IBM Plex Mono',monospace;color:var(--ink4)">#${String(o.id).padStart(3,'0')}</td><td><span class="badge ${mB[o.mode]}">${mL[o.mode]}</span></td><td style="font-family:'IBM Plex Mono',monospace">${o.veh}</td><td style="font-family:'IBM Plex Mono',monospace">${o.trip}</td><td>${o.from}→${o.to}</td><td>${o.weight}kg</td><td style="font-family:'IBM Plex Mono',monospace">${o.tw_fmt}</td><td style="font-family:'IBM Plex Mono',monospace;${o.mode==='unserved'?'color:var(--red)':''}">${o.mode==='unserved'?'—':o.dt_fmt}</td><td>${isOT(o)?`<span style="color:var(--red)">+${o.overtime}min</span>`:o.mode==='unserved'?'<span style="color:var(--red)">未服务</span>':'<span style="color:var(--green)">准时</span>'}</td></tr>`).join('');
+  let btns='';const s2=Math.max(1,ordPage-3),e2=Math.min(pgs,s2+6);
+  if(ordPage>1)btns+=`<button class="sb" onclick="goP(${ordPage-1})" style="padding:3px 8px">‹</button>`;
+  for(let p=s2;p<=e2;p++)btns+=`<button class="sb${p===ordPage?' active':''}" onclick="goP(${p})" style="padding:3px 8px;min-width:26px">${p}</button>`;
+  if(ordPage<pgs)btns+=`<button class="sb" onclick="goP(${ordPage+1})" style="padding:3px 8px">›</button>`;
+  document.getElementById('ord-pb').innerHTML=btns;
+}
+function goP(p){ordPage=p;renderOrdTbl();}
+
+// ═══════ WEIGHT ANALYSIS ═══════
+PINIT.weight=function(){
+  const labs=['μ=10','μ=20','μ=30','μ=40'],keys=['10','20','30','40'],vals=keys.map(k=>WEIGHT[k]);
+  // Total cost line+bar combo
+  mkChart('wt-total','bar',{labels:labs,datasets:[
+    {label:'总成本（元）',data:vals.map(d=>d.total),backgroundColor:['#1a854a55','#2966c455','#c27d1a55','#d9423055'],borderColor:['#1a854a','#2966c4','#c27d1a','#d94230'],borderWidth:2}
+  ]});
+  // Orders by mode - line chart (like fig 5.6)
+  mkChart('wt-orders','line',{labels:labs,datasets:[
+    {label:'物流专车',data:vals.map(d=>d.lo),borderColor:CL.log,backgroundColor:CL.log+'15',pointBackgroundColor:CL.log,tension:.3},
+    {label:'城乡公交',data:vals.map(d=>d.bo),borderColor:CL.bus,backgroundColor:CL.bus+'15',pointBackgroundColor:CL.bus,tension:.3},
+    {label:'众包车辆',data:vals.map(d=>d.co),borderColor:CL.crowd,backgroundColor:CL.crowd+'15',pointBackgroundColor:CL.crowd,tension:.3},
+    {label:'未服务',data:vals.map(d=>d.un),borderColor:CL.ot,backgroundColor:CL.ot+'15',pointBackgroundColor:CL.ot,tension:.3,borderDash:[5,3]},
+  ]});
+  // Cost stack
+  mkChart('wt-stack','bar',{labels:labs,datasets:[
+    {label:'众包',data:vals.map(d=>d.crowd),backgroundColor:CL.crowd+'cc'},
+    {label:'公交',data:vals.map(d=>d.bus),backgroundColor:CL.bus+'cc'},
+    {label:'物流',data:vals.map(d=>d.log),backgroundColor:CL.log+'cc'},
+    {label:'固定',data:vals.map(d=>d.fixed),backgroundColor:CL.fixed+'cc'},
+    {label:'超时',data:vals.map(d=>d.ot),backgroundColor:CL.ot+'cc'},
+  ]},stk());
+  // Unserved bar
+  mkChart('wt-unserved','bar',{labels:labs,datasets:[{label:'未服务数量',data:vals.map(d=>d.un),
+    backgroundColor:['#1a854a55','#2966c455','#c27d1a55','#d9423055'],borderColor:['#1a854a','#2966c4','#c27d1a','#d94230'],borderWidth:2}]});
+  // Ratio stacked 100%
+  mkChart('wt-ratio','bar',{labels:labs,datasets:[
+    {label:'物流专车',data:vals.map(d=>d.lo/(d.lo+d.bo+d.co+d.un)*100),backgroundColor:CL.log+'cc'},
+    {label:'城乡公交',data:vals.map(d=>d.bo/(d.lo+d.bo+d.co+d.un)*100),backgroundColor:CL.bus+'cc'},
+    {label:'众包车辆',data:vals.map(d=>d.co/(d.lo+d.bo+d.co+d.un)*100),backgroundColor:CL.crowd+'cc'},
+    {label:'未服务',data:vals.map(d=>d.un/(d.lo+d.bo+d.co+d.un)*100),backgroundColor:CL.ot+'cc'},
+  ]},{...stk(),scales:{x:{stacked:true,ticks:{color:'#9a9aac',font:{size:9}},grid:{color:'rgba(0,0,0,.04)'}},y:{stacked:true,ticks:{color:'#9a9aac',font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(0,0,0,.04)'},max:100}}});
+  // Table
+  document.getElementById('wt-tbody').innerHTML=keys.map(k=>{const d=WEIGHT[k];
+    return`<tr><td style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--red)">N(${k},8²)</td>
+    <td style="color:var(--amber)">${d.crowd.toFixed(2)}</td><td style="color:var(--green)">${d.bus.toFixed(2)}</td>
+    <td style="color:var(--blue)">${d.log.toFixed(2)}</td><td style="color:var(--purple)">${d.fixed.toFixed(2)}</td>
+    <td style="color:var(--red)">${d.ot.toFixed(2)}</td><td style="font-weight:700;color:var(--red)">${d.total.toFixed(2)}</td>
+    <td>${d.lo}</td><td>${d.bo}</td><td>${d.co}</td><td style="color:var(--red)">${d.un}</td><td>${d.v}</td></tr>`;
+  }).join('');
+};
+
+// ═══════ BOOT ═══════
+// Close dropdown when clicking outside
+document.addEventListener('click',function(e){
+  document.querySelectorAll('.nav-dd').forEach(dd=>{
+    if(!dd.contains(e.target)){dd.classList.remove('open');}
+  });
+});
+PINIT.overview();INITS.overview=true;
+</script>
+</body>
+</html>
